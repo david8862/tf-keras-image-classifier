@@ -9,8 +9,7 @@ from tqdm import tqdm
 from pycocotools.coco import COCO
 
 
-#sets=['train2017', 'val2017']
-sets=['val']
+sets=['train2017', 'val2017']
 
 xml_head_template = """\
 <annotation>

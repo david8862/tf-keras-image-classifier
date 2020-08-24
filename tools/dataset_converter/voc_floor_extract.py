@@ -20,8 +20,6 @@ def extract_roi(dataset_path, year, image_id, output_path, include_difficult):
     if not os.path.exists(img_file_name):
         raise ValueError('image file for id: {} not exists'.format(image_id))
 
-    #img_file_name = '%s/VOC%s/JPEGImages/%s.jpeg'%(dataset_path, year, image_id)
-    #print('xiaobizh ---', img_file_name)
     img = cv2.imread(img_file_name, cv2.IMREAD_COLOR)
 
     xmin = int(img.shape[1]*0.35)
@@ -36,43 +34,6 @@ def extract_roi(dataset_path, year, image_id, output_path, include_difficult):
     output_img_name = os.path.join(output_path, '%s.jpg'%(image_id))
     cv2.imwrite(output_img_name, area)
 
-
-
-
-    #xml_file = open('%s/VOC%s/Annotations/%s.xml'%(dataset_path, year, image_id))
-    #tree=ET.parse(xml_file)
-    #root = tree.getroot()
-
-    #i=0
-    #for obj in root.iter('object'):
-        #difficult = obj.find('difficult')
-        #if difficult is None:
-            #difficult = '0'
-        #else:
-            #difficult = difficult.text
-        #cls = obj.find('name').text
-        #if cls not in classes:
-            #continue
-        #if not include_difficult and int(difficult)==1:
-            #continue
-        #cls_id = classes.index(cls)
-        #xmlbox = obj.find('bndbox')
-        #b = (int(xmlbox.find('xmin').text), int(xmlbox.find('ymin').text), int(xmlbox.find('xmax').text), int(xmlbox.find('ymax').text))
-
-        #xmin = max(0, b[0])
-        #ymin = max(0, b[1])
-        #xmax = min(img.shape[1], b[2])
-        #ymax = min(img.shape[0], b[3])
-        ## bypass invalid box
-        #if (xmin >= xmax) or (ymin >= ymax):
-            #continue
-
-        #area = img[ymin:ymax, xmin:xmax]
-        #output_img_name = os.path.join(output_path, '%s_%s_%d.jpg'%(image_id, cls, i))
-        #cv2.imwrite(output_img_name, area)
-        #i += 1
-
-        #class_count[cls] = class_count[cls] + 1
 
 
 def has_object(dataset_path, year, image_id, include_difficult):

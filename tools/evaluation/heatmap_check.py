@@ -13,7 +13,7 @@ from tensorflow.keras.models import load_model
 import tensorflow as tf
 import tensorflow.keras.backend as K
 
-sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
 from common.utils import get_classes, get_custom_objects, optimize_tf_gpu
 from common.preprocess_crop import load_and_crop_img
 
@@ -111,7 +111,7 @@ def generate_heatmap(image_path, model_path, heatmap_path, class_names=None):
                     cv2.FONT_HERSHEY_SIMPLEX,
                     fontScale=1,
                     color=(0,0,255),
-                    thickness=2,
+                    thickness=1,
                     lineType=cv2.LINE_AA)
 
         # save overlaped image

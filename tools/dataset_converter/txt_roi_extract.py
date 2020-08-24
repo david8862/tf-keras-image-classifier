@@ -35,7 +35,6 @@ def main():
         for j, anno in enumerate(anno_list):
             line = anno.split()
             xmin,ymin,xmax,ymax,score = int(float(line[0])), int(float(line[1])),int(float(line[2])),int(float(line[3])),float(line[4])
-            #print('xiaobizh ---', score)
 
             if (score > 0.6) and (xmax-xmin>50) and (ymax-ymin>50):
                 area = img[ymin:ymax, xmin:xmax]
