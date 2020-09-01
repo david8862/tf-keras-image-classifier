@@ -4,119 +4,21 @@
 Train CNN classifier on images split into directories.
 """
 import os, sys, argparse, time
-import numpy as np
-import cv2
 
-from tensorflow.keras.layers import Conv2D, Dense, GlobalAveragePooling2D
-from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping, ReduceLROnPlateau, LearningRateScheduler, TerminateOnNaN
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.applications.mobilenet import MobileNet
-from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
 import tensorflow.keras.backend as K
 import tensorflow as tf
 
-from common import preprocess_crop
+from classifier.model import get_model
+from classifier.data import get_data_generator
 from common.utils import get_classes, optimize_tf_gpu
 from common.model_utils import get_optimizer
-from common.backbones.mobilenet_v3 import MobileNetV3Large, MobileNetV3Small
-from common.backbones.simple_cnn import SimpleCNN, SimpleCNNLite
 
 optimize_tf_gpu(tf, K)
 
 
-
-def get_generators(train_data_path, val_data_path, model_input_shape, batch_size, class_names):
-    train_datagen = ImageDataGenerator(
-        rescale=1./255,
-        #samplewise_std_normalization=True,
-        #validation_split=0.1,
-        zoom_range=0.25,
-        brightness_range=[0.5,1.5],
-        channel_shift_range=0.1,
-        shear_range=0.2,
-        vertical_flip=True,
-        horizontal_flip=True,
-        #rotation_range=30.,
-        width_shift_range=0.1,
-        height_shift_range=0.1,
-        fill_mode='constant',
-        cval=0.)
-
-    val_datagen = ImageDataGenerator(rescale=1./255)
-        #samplewise_std_normalization=True)
-
-    train_generator = train_datagen.flow_from_directory(
-        train_data_path,
-        target_size=model_input_shape,
-        batch_size=batch_size,
-        classes=class_names,
-        class_mode='categorical',
-        #save_to_dir='check',
-        #save_prefix='augmented_',
-        #save_format='jpg',
-        interpolation = 'nearest:center')
-
-    val_generator = val_datagen.flow_from_directory(
-        val_data_path,
-        target_size=model_input_shape,
-        batch_size=batch_size,
-        classes=class_names,
-        class_mode='categorical',
-        interpolation = 'nearest:center')
-
-    return train_generator, val_generator
-
-
-def get_base_model(model_type, model_input_shape, weights='imagenet'):
-    if model_type == 'mobilenet':
-        model = MobileNet(input_shape=model_input_shape+(3,), weights=weights, pooling=None, include_top=False, alpha=0.5)
-    elif model_type == 'mobilenetv2':
-        model = MobileNetV2(input_shape=model_input_shape+(3,), weights=weights, pooling=None, include_top=False, alpha=0.5)
-    elif model_type == 'mobilenetv3large':
-        model = MobileNetV3Large(input_shape=model_input_shape+(3,), weights=weights, pooling=None, include_top=False, alpha=0.75)
-    elif model_type == 'mobilenetv3small':
-        model = MobileNetV3Small(input_shape=model_input_shape+(3,), weights=weights, pooling=None, include_top=False, alpha=0.75)
-    elif model_type == 'simple_cnn':
-        model = SimpleCNN(input_shape=model_input_shape+(3,), weights=None, pooling=None, include_top=False)
-    elif model_type == 'simple_cnn_lite':
-        model = SimpleCNNLite(input_shape=model_input_shape+(3,), weights=None, pooling=None, include_top=False)
-    else:
-        raise ValueError('Unsupported model type')
-    return model
-
-
-def get_model(model_type, class_names, model_input_shape, head_conv_channel, weights_path=None):
-    # create the base pre-trained model
-    base_model = get_base_model(model_type, model_input_shape)
-    backbone_len = len(base_model.layers)
-
-    # add a global spatial average pooling layer
-    #x = base_model.get_layer('conv_pw_11_relu').output
-    x = base_model.output
-
-    if head_conv_channel:
-        x = Conv2D(head_conv_channel, kernel_size=1, padding='same', activation='relu', name='head_conv')(x)
-    x = GlobalAveragePooling2D()(x)
-
-    # let's add a fully-connected layer
-    #x = Dense(128, activation='relu')(x)
-    # and a logistic layer
-    predictions = Dense(len(class_names), activation='softmax')(x)
-
-    # this is the model we will train
-    model = Model(inputs=base_model.input, outputs=predictions)
-
-    if weights_path:
-        model.load_weights(weights_path, by_name=False)#, skip_mismatch=True)
-        print('Load weights {}.'.format(weights_path))
-
-    return model, backbone_len
-
-
-
 def main(args):
-    log_dir = 'logs'
+    log_dir = 'logs/000'
     # get class info
     class_names = get_classes(args.classes_path)
 
@@ -138,7 +40,8 @@ def main(args):
     callbacks=[logging, checkpoint, reduce_lr, early_stopping, terminate_on_nan]
 
     # prepare train&val data generator
-    train_generator, val_generator = get_generators(args.train_data_path, args.val_data_path, args.model_input_shape, args.batch_size, class_names)
+    train_generator = get_data_generator(args.train_data_path, args.model_input_shape, args.batch_size, class_names, mode='train')
+    val_generator = get_data_generator(args.val_data_path, args.model_input_shape, args.batch_size, class_names, mode='val')
 
     # prepare optimizer
     optimizer = get_optimizer(args.optimizer, args.learning_rate, decay_type=None)
@@ -220,9 +123,9 @@ if __name__ == '__main__':
 
     # Data options
     parser.add_argument('--train_data_path', type=str, required=True,
-        help='path to train data')
+        help='path to train image dataset')
     parser.add_argument('--val_data_path', type=str, required=True,
-        help='path to validation dataset')
+        help='path to validation image dataset')
     parser.add_argument('--classes_path', type=str, required=True,
         help='path to classes definition', default=None)
 

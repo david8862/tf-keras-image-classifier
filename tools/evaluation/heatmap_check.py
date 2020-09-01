@@ -111,7 +111,7 @@ def generate_heatmap(image_path, model_path, heatmap_path, class_names=None):
                     cv2.FONT_HERSHEY_SIMPLEX,
                     fontScale=1,
                     color=(0,0,255),
-                    thickness=1,
+                    thickness=2,
                     lineType=cv2.LINE_AA)
 
         # save overlaped image
@@ -121,10 +121,10 @@ def generate_heatmap(image_path, model_path, heatmap_path, class_names=None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--image_path', type=str, required=True, help='Image file or directory to predict')
     parser.add_argument('--model_path', type=str, required=True, help='model file to predict')
-    parser.add_argument('--heatmap_path', type=str, required=True, help='output heatmap file or directory')
+    parser.add_argument('--image_path', type=str, required=True, help='Image file or directory to predict')
     parser.add_argument('--classes_path', type=str, required=False, default=None, help='path to class definition, optional')
+    parser.add_argument('--heatmap_path', type=str, required=True, help='output heatmap file or directory')
 
     args = parser.parse_args()
 
