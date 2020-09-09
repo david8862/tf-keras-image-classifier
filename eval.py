@@ -58,7 +58,6 @@ def load_eval_model(model_path):
 
 
 def main():
-    # class YOLO defines the default value, so suppress any default here
     parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS, description='evaluate CNN classifer model (h5) with test dataset')
     '''
     Command line options

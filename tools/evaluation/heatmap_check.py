@@ -31,7 +31,8 @@ def detect_last_conv(model):
 
     for layer in inverted_list_layers:
         i -= 1
-        if layer == "Conv2D":
+        # support Conv2D, DepthwiseConv2D and SeparableConv2D
+        if layer == "Conv2D" or layer == "DepthwiseConv2D" or layer == "SeparableConv2D":
             return i
 
 def get_target_size(model):
@@ -61,6 +62,7 @@ def generate_heatmap(image_path, model_path, heatmap_path, class_names=None):
         image_list = [image_path]
         heatmap_list = [heatmap_path]
 
+    # loop the sample list to generate all heatmaps
     for i, (image_file, heatmap_file) in enumerate(zip(image_list, heatmap_list)):
         # process input
         target_size=get_target_size(model)

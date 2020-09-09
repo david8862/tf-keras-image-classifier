@@ -113,7 +113,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS, description='train a simple CNN classifier')
     # Model definition options
     parser.add_argument('--model_type', type=str, required=False, default='mobilenetv2',
-        help='backbone model type: mobilenetv2/mobilenet(v1), default=%(default)s')
+        help='backbone model type: mobilenetv3/v2/simple_cnn, default=%(default)s')
     parser.add_argument('--model_input_shape', type=str, required=False, default='224x224',
         help = "model image input shape as <height>x<width>, default=%(default)s")
     parser.add_argument('--head_conv_channel', type=int, required=False, default=None,
@@ -141,7 +141,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--init_epoch', type=int,required=False, default=0,
         help = "Initial training epochs for fine tune training, default=%(default)s")
-    parser.add_argument('--transfer_epoch', type=int, required=False, default=20,
+    parser.add_argument('--transfer_epoch', type=int, required=False, default=5,
         help = "Transfer training (from Imagenet) stage epochs, default=%(default)s")
     parser.add_argument('--total_epoch', type=int,required=False, default=100,
         help = "Total training epochs, default=%(default)s")
