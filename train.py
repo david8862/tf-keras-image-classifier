@@ -116,7 +116,7 @@ if __name__ == '__main__':
         help='backbone model type: mobilenetv3/v2/simple_cnn, default=%(default)s')
     parser.add_argument('--model_input_shape', type=str, required=False, default='224x224',
         help = "model image input shape as <height>x<width>, default=%(default)s")
-    parser.add_argument('--head_conv_channel', type=int, required=False, default=None,
+    parser.add_argument('--head_conv_channel', type=int, required=False, default=128,
         help = "channel number for head part convolution, default=%(default)s")
     parser.add_argument('--weights_path', type=str, required=False, default=None,
         help = "Pretrained model/weights file for fine tune")

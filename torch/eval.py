@@ -6,8 +6,9 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision import datasets, transforms
 from torchsummary import summary
+
+from classifier.data import get_dataloader
 
 
 def evaluate(model, device, eval_loader, batch_size):
@@ -64,18 +65,10 @@ def main():
     torch.manual_seed(1)
 
     # prepare eval dataset loader
-    kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
-    eval_dataset = datasets.ImageFolder(args.dataset_path, transform=transforms.Compose([
-                           transforms.CenterCrop(args.model_input_shape),
-                           #transforms.RandomCrop(args.model_input_shape, padding=0, pad_if_needed=True),
-                           #transforms.Grayscale(num_output_channels=3),
-                           transforms.ToTensor(),
-                           transforms.Normalize((0.1307,), (0.3081,))
-                       ]))
-    eval_loader = torch.utils.data.DataLoader(eval_dataset, batch_size=1, shuffle=True, **kwargs)
+    eval_loader = get_dataloader(args.dataset_path, args.model_input_shape, batch_size=1, use_cuda=use_cuda, mode='eval')
 
-    num_classes = len(eval_dataset.classes)
-    print('Classes:', eval_dataset.classes)
+    num_classes = len(eval_loader.dataset.classes)
+    print('Classes:', eval_loader.dataset.classes)
 
     # get train model
     model = torch.load(args.model_path, map_location=device)

@@ -3,13 +3,30 @@
 """
 Train CNN classifier on images split into directories.
 """
+import numpy as np
+import cv2
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from common import preprocess_crop
+
+
+def rand(a=0, b=1):
+    return np.random.rand()*(b-a) + a
+
+def random_gray(x):
+    prob = -2.0
+
+    convert = rand() < prob
+    if convert:
+        x = cv2.cvtColor(x, cv2.COLOR_RGB2GRAY)
+        x = cv2.cvtColor(x, cv2.COLOR_GRAY2RGB)
+    return x
+
 
 
 def get_data_generator(data_path, model_input_shape, batch_size, class_names, mode='train'):
     if mode == 'train':
         datagen = ImageDataGenerator(
+            preprocessing_function=random_gray,
             rescale=1./255,
             #samplewise_std_normalization=True,
             #validation_split=0.1,
@@ -37,8 +54,11 @@ def get_data_generator(data_path, model_input_shape, batch_size, class_names, mo
             interpolation = 'nearest:center')
 
     elif mode == 'val' or mode == 'eval':
-        datagen = ImageDataGenerator(rescale=1./255)
+        datagen = ImageDataGenerator(
+            preprocessing_function=random_gray,
+            rescale=1./255,
             #samplewise_std_normalization=True)
+            )
 
         data_generator = datagen.flow_from_directory(
             data_path,

@@ -8,26 +8,19 @@ import cv2
 import matplotlib.pyplot as plt
 
 import torch
-from torchvision import transforms
 from torchsummary import summary
 
 # add root path of model definition here,
 # to make sure that we can load .pth model file with torch.load()
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
+from classifier.data import get_transform
 from common.utils import get_classes
 
 
 def preprocess_image(image_file, target_size):
     # load & preprocess image
     image = Image.open(image_file).convert('RGB')
-
-    transform=transforms.Compose([
-                           transforms.CenterCrop(target_size),
-                           #transforms.RandomCrop(target_size, padding=0, pad_if_needed=True),
-                           #transforms.Grayscale(num_output_channels=3),
-                           transforms.ToTensor(),
-                           transforms.Normalize((0.1307,), (0.3081,))
-                       ])
+    transform = get_transform(target_size, mode='eval')
 
     image_tensor = transform(image)
     return image_tensor

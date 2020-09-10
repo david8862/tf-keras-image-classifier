@@ -7,10 +7,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torchvision import datasets, transforms
 from torchsummary import summary
 
 from classifier.model import Classifier
+from classifier.data import get_dataloader
 from common.model_utils import get_optimizer
 
 
@@ -133,37 +133,14 @@ def main():
     device = torch.device("cuda" if use_cuda else "cpu")
     torch.manual_seed(1)
 
-
     # prepare train&val dataset loader
-    kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
-    train_dataset = datasets.ImageFolder(args.train_data_path, transform=transforms.Compose([
-                           transforms.CenterCrop(args.model_input_shape),
-                           #transforms.RandomCrop(args.model_input_shape, padding=0, pad_if_needed=True),
-                           transforms.RandomHorizontalFlip(p=0.5),
-                           transforms.RandomVerticalFlip(p=0.5),
-                           transforms.ColorJitter(brightness=0.5, contrast=0.3, saturation=0.3, hue=0.3),
-                           transforms.RandomGrayscale(p=0.1),
-                           #transforms.Grayscale(num_output_channels=3),
-                           #transforms.RandomRotation(30, resample=False, expand=False, center=None),
-                           transforms.ToTensor(),
-                           transforms.Normalize((0.1307,), (0.3081,))
-                       ]))
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, **kwargs)
-
-
-    val_dataset = datasets.ImageFolder(args.val_data_path, transform=transforms.Compose([
-                           transforms.CenterCrop(args.model_input_shape),
-                           #transforms.RandomCrop(args.model_input_shape, padding=0, pad_if_needed=True),
-                           #transforms.Grayscale(num_output_channels=3),
-                           transforms.ToTensor(),
-                           transforms.Normalize((0.1307,), (0.3081,))
-                       ]))
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True, **kwargs)
+    train_loader = get_dataloader(args.train_data_path, args.model_input_shape, args.batch_size, use_cuda=use_cuda, mode='train')
+    val_loader = get_dataloader(args.val_data_path, args.model_input_shape, args.batch_size, use_cuda=use_cuda, mode='val')
 
     # check if classes match on train & val dataset
-    assert train_dataset.classes == val_dataset.classes, 'class mismatch between train & val dataset'
-    num_classes = len(train_dataset.classes)
-    print('Classes:', train_dataset.classes)
+    assert train_loader.dataset.classes == val_loader.dataset.classes, 'class mismatch between train & val dataset'
+    num_classes = len(train_loader.dataset.classes)
+    print('Classes:', train_loader.dataset.classes)
 
     # get train model
     model = Classifier(args.model_type, num_classes, args.head_conv_channel).to(device)
