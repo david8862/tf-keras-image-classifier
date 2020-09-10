@@ -33,7 +33,8 @@ def correct_pad(backend, inputs, kernel_size):
             (correct[1] - adjust[1], correct[1]))
 
 
-def SimpleCNN(input_shape,
+def SimpleCNN(input_shape=None,
+              input_tensor=None,
               weights=None,
               pooling=None,
               include_top=False,
@@ -44,9 +45,17 @@ def SimpleCNN(input_shape,
 
     regularization = l2(l2_regularization)
 
-    # base
-    img_input = Input(input_shape)
+    # If input_shape is None and input_tensor is None using standart shape
+    if input_shape is None and input_tensor is None:
+        input_shape = (None, None, 3)
 
+    if input_tensor is None:
+        img_input = Input(shape=input_shape)
+    else:
+        img_input = input_tensor
+
+
+    # base
     x = ZeroPadding2D(padding=correct_pad(K, img_input, 3),
                              name='Conv_pad')(img_input)
     x = Conv2D(filters=16,
@@ -129,7 +138,8 @@ def SimpleCNN(input_shape,
     return model
 
 
-def SimpleCNNLite(input_shape,
+def SimpleCNNLite(input_shape=None,
+                  input_tensor=None,
                   weights=None,
                   pooling=None,
                   include_top=False,
@@ -140,9 +150,17 @@ def SimpleCNNLite(input_shape,
 
     regularization = l2(l2_regularization)
 
-    # base
-    img_input = Input(input_shape)
+    # If input_shape is None and input_tensor is None using standart shape
+    if input_shape is None and input_tensor is None:
+        input_shape = (None, None, 3)
 
+    if input_tensor is None:
+        img_input = Input(shape=input_shape)
+    else:
+        img_input = input_tensor
+
+
+    # base
     x = ZeroPadding2D(padding=correct_pad(K, img_input, 3),
                              name='Conv_pad')(img_input)
     x = Conv2D(filters=16,
