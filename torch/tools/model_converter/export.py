@@ -6,7 +6,7 @@ import torch
 
 # add root path of model definition here,
 # to make sure that we can load .pth model file with torch.load()
-sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
 
 
 def model_export(model_path, model_input_shape, output_path, batch_size=1):
@@ -73,7 +73,7 @@ def model_export(model_path, model_input_shape, output_path, batch_size=1):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_path', type=str, required=True, help='model file to export')
-    parser.add_argument('--model_input_shape', type=str, required=True, help='model input image shape as <height>x<width>')
+    parser.add_argument('--model_input_shape', type=str, required=True, help='model input image shape as <height>x<width>, default=%(default)s', default='224x224')
     parser.add_argument('--output_path', type=str, required=True, help='output heatmap file or directory')
 
     args = parser.parse_args()

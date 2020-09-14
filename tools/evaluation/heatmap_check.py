@@ -73,8 +73,7 @@ def generate_heatmap(image_path, model_path, heatmap_path, class_names=None):
         # predict and get output
         preds = model.predict(x)
         index = np.argmax(preds[0])
-        print(preds[0])
-        print('predict index: {}'.format(index))
+        score = preds[0][index]
         max_output = model.output[:, index]
 
         # detect last conv layer
@@ -108,12 +107,12 @@ def generate_heatmap(image_path, model_path, heatmap_path, class_names=None):
         superimposed_img = heatmap * 0.4 + img
 
         # show predict class index or name on image
-        cv2.putText(superimposed_img, '{}'.format(class_names[index] if class_names else index),
+        cv2.putText(superimposed_img, '{name}:{conf:.3f}'.format(name=class_names[index] if class_names else index, conf=float(score)),
                     (10,30),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     fontScale=1,
                     color=(0,0,255),
-                    thickness=2,
+                    thickness=1,
                     lineType=cv2.LINE_AA)
 
         # save overlaped image

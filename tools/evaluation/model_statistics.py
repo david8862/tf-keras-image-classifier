@@ -82,7 +82,6 @@ def main():
     if args.model_image_size:
         height, width = args.model_image_size.split('x')
         height, width = int(height), int(width)
-        assert (height%32 == 0 and width%32 == 0), 'model_image_size should be multiples of 32'
 
     # to calculate FLOPs we need to use fixed input shape & batch size
     assert height and width and channel, 'input shape should be specified'

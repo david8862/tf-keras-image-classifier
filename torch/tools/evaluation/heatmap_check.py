@@ -12,18 +12,9 @@ from torchsummary import summary
 
 # add root path of model definition here,
 # to make sure that we can load .pth model file with torch.load()
-sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
-from classifier.data import get_transform
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
+from common.data_utils import preprocess_image
 from common.utils import get_classes
-
-
-def preprocess_image(image_file, target_size):
-    # load & preprocess image
-    image = Image.open(image_file).convert('RGB')
-    transform = get_transform(target_size, mode='eval')
-
-    image_tensor = transform(image)
-    return image_tensor
 
 
 def generate_heatmap(image_path, model_path, model_input_shape, heatmap_path, class_names=None):
@@ -53,7 +44,8 @@ def generate_heatmap(image_path, model_path, model_input_shape, heatmap_path, cl
     # loop the sample list to generate all heatmaps
     for i, (image_file, heatmap_file) in enumerate(zip(image_list, heatmap_list)):
         # process input
-        img = preprocess_image(image_file, target_size=model_input_shape)
+        image = Image.open(image_file).convert('RGB')
+        img = preprocess_image(image, target_size=model_input_shape, return_tensor=True)
         img = img.unsqueeze(0).to(device)
 
         # got feature map & predict score of the model
@@ -65,6 +57,7 @@ def generate_heatmap(image_path, model_path, model_input_shape, heatmap_path, cl
         # got class index with highest predict score
         index = torch.argmax(output).item()
         pred_class = output[:, index]
+        score = pred_class.detach().item()
 
         features.register_hook(extract)
         # get gradient of the feature map to the predicted class
@@ -97,7 +90,7 @@ def generate_heatmap(image_path, model_path, model_input_shape, heatmap_path, cl
         superimposed_img = heatmap * 0.4 + img
 
         # show predict class index or name on image
-        cv2.putText(superimposed_img, '{}'.format(class_names[index] if class_names else index),
+        cv2.putText(superimposed_img, '{name}:{conf:.3f}'.format(name=class_names[index] if class_names else index, conf=float(score)),
                     (10,30),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     fontScale=1,
@@ -115,7 +108,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--image_path', type=str, required=True, help='Image file or directory to predict')
     parser.add_argument('--model_path', type=str, required=True, help='model file to predict')
-    parser.add_argument('--model_input_shape', type=str, required=True, help='model input image shape as <height>x<width>')
+    parser.add_argument('--model_input_shape', type=str, required=False, help='model input image shape as <height>x<width>, default=%(default)s', default='224x224')
     parser.add_argument('--heatmap_path', type=str, required=True, help='output heatmap file or directory')
     parser.add_argument('--classes_path', type=str, required=False, default=None, help='path to class definition, optional')
 
