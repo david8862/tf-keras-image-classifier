@@ -29,14 +29,29 @@ def main():
         base_name = os.path.basename(txt_file).split('.')[0]
         jpg_file = base_name + '.jpg'
         jpg_path = os.path.join('/mnt/nfs/Masked/VOC2007/JPEGImages/', jpg_file)
+        #jpg_path = os.path.join('/mnt/nfs/b3day/', jpg_file)
         img = cv2.imread(jpg_path, cv2.IMREAD_COLOR)
+        height, width, channel = img.shape
 
         anno_list = get_ann(txt_file)
         for j, anno in enumerate(anno_list):
             line = anno.split()
             xmin,ymin,xmax,ymax,score = int(float(line[0])), int(float(line[1])),int(float(line[2])),int(float(line[3])),float(line[4])
 
-            if (score > 0.6) and (xmax-xmin>50) and (ymax-ymin>50):
+            if xmax-xmin < 300:
+                xmax += (300 - (xmax - xmin))//2
+                xmin -= (300 - (xmax - xmin))//2
+                xmax = min(width, xmax)
+                xmin = max(0, xmin)
+
+            if ymax-ymin < 300:
+                ymax += (300 - (ymax - ymin))//2
+                ymin -= (300 - (ymax - ymin))//2
+                ymax = min(height, ymax)
+                ymin = max(0, ymin)
+
+            if (score > 0.8):
+            #if (score > 0.6) and (xmax-xmin>50) and (ymax-ymin>50):
                 area = img[ymin:ymax, xmin:xmax]
                 output_img_name = os.path.join(args.output_path, '%s_%d.jpg'%(base_name, j))
                 cv2.imwrite(output_img_name, area)

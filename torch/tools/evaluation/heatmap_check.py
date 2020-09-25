@@ -46,11 +46,11 @@ def generate_heatmap(image_path, model_path, model_input_shape, heatmap_path, cl
         # process input
         image = Image.open(image_file).convert('RGB')
         img = preprocess_image(image, target_size=model_input_shape, return_tensor=True)
-        img = img.unsqueeze(0).to(device)
+        x = img.unsqueeze(0).to(device)
 
         # got feature map & predict score of the model
         model.eval()
-        features = model.features(img)
+        features = model.features(x)
         output = model.classifier(features)
         feature_channel = list(features.shape)[1] # feature map channel number
 
@@ -83,7 +83,18 @@ def generate_heatmap(image_path, model_path, model_input_shape, heatmap_path, cl
         #plt.show()
 
         # overlap heatmap to frame image
-        img = cv2.imread(image_file)
+        #img = cv2.imread(image_file)
+        img = img.detach().cpu().numpy()
+        # convert pytorch channel first tensor back
+        # to channel last
+        img = np.moveaxis(img, 0, -1)
+
+        # De-normalize tensor to image, and resize
+        # for result display
+        img = (img * 78.5545 + 33.3285).astype(np.uint8)
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        img = cv2.resize(img, (224, 224))
+
         heatmap = cv2.resize(heatmap, (img.shape[1], img.shape[0]))
         heatmap = np.uint8(255 * heatmap)
         heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
@@ -95,7 +106,7 @@ def generate_heatmap(image_path, model_path, model_input_shape, heatmap_path, cl
                     cv2.FONT_HERSHEY_SIMPLEX,
                     fontScale=1,
                     color=(0,0,255),
-                    thickness=1,
+                    thickness=2,
                     lineType=cv2.LINE_AA)
 
         # save overlaped image

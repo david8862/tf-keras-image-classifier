@@ -14,6 +14,9 @@ class_count = {}
 
 def extract_roi(dataset_path, year, image_id, output_path, include_difficult):
     img_file_name = '%s/VOC%s/JPEGImages/%s.jpg'%(dataset_path, year, image_id)
+    # check if the image file exists
+    if not os.path.exists(img_file_name):
+        img_file_name = '%s/VOC%s/JPEGImages/%s.jpeg'%(dataset_realpath, year, image_id)
     img = cv2.imread(img_file_name, cv2.IMREAD_COLOR)
 
     xml_file = open('%s/VOC%s/Annotations/%s.xml'%(dataset_path, year, image_id))

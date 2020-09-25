@@ -13,7 +13,7 @@ def rand(a=0, b=1):
     return np.random.rand()*(b-a) + a
 
 def random_gray(x):
-    prob = -2.0
+    prob = 2.0
 
     convert = rand() < prob
     if convert:
@@ -66,7 +66,7 @@ def get_data_generator(data_path, model_input_shape, batch_size, class_names, mo
             batch_size=batch_size,
             classes=class_names,
             class_mode='categorical',
-            interpolation = 'nearest:center')
+            interpolation = 'nearest')
     else:
         raise ValueError('output model file is not specified')
 

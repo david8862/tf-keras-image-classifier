@@ -66,8 +66,9 @@ def generate_heatmap(image_path, model_path, heatmap_path, class_names=None):
     for i, (image_file, heatmap_file) in enumerate(zip(image_list, heatmap_list)):
         # process input
         target_size=get_target_size(model)
-        x = load_and_crop_img(image_file, target_size=target_size, interpolation='nearest:center')
-        x = np.array(x) / 255.
+        img = load_and_crop_img(image_file, target_size=target_size, interpolation='nearest:random')
+        img = np.array(img)
+        x = img / 255.
         x = np.expand_dims(x, axis=0)
 
         # predict and get output
@@ -100,7 +101,9 @@ def generate_heatmap(image_path, model_path, heatmap_path, class_names=None):
         #plt.show()
 
         # overlap heatmap to frame image
-        img = cv2.imread(image_file)
+        #img = cv2.imread(image_file)
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        img = cv2.resize(img, (224, 224))
         heatmap = cv2.resize(heatmap, (img.shape[1], img.shape[0]))
         heatmap = np.uint8(255 * heatmap)
         heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
