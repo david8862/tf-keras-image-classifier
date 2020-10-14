@@ -77,7 +77,7 @@ void display_usage() {
 
 
 // CNN Classifier postprocess
-void classifier_postprocess(const Tensor* score_tensor, std::vector<uint8_t> &class_indexes)
+void classifier_postprocess(const Tensor* score_tensor, std::vector<std::pair<uint8_t, float>> &class_results)
 {
     // 1. do following transform to get the top-1 class index:
     //
@@ -148,7 +148,7 @@ void classifier_postprocess(const Tensor* score_tensor, std::vector<uint8_t> &cl
                 max_score = bytes[i];
             }
         }
-        class_indexes.emplace_back(class_index);
+        class_results.emplace_back(std::make_pair(class_index, max_score));
     }
     return;
 }
@@ -393,18 +393,18 @@ void RunInference(Settings* s) {
     MNN_ASSERT(output_tensor->getType().bits == 32);
 
 
-    std::vector<uint8_t> class_indexes;
+    std::vector<std::pair<uint8_t, float>> class_results;
     // Do classifier_postprocess to get top-1 class index
     gettimeofday(&start_time, nullptr);
-    classifier_postprocess(output_tensor.get(), class_indexes);
+    classifier_postprocess(output_tensor.get(), class_results);
     gettimeofday(&stop_time, nullptr);
     MNN_PRINT("classifier_postprocess time: %lf ms\n", (get_us(stop_time) - get_us(start_time)) / 1000);
 
 
     // Show classification result
     MNN_PRINT("Inferenced class:\n");
-    for(auto class_index : class_indexes) {
-        MNN_PRINT("%s\n", classes[class_index].c_str());
+    for(auto class_result : class_results) {
+        MNN_PRINT("%s: %f\n", classes[class_result.first].c_str(), class_result.second);
     }
 
     // Release session and model
