@@ -42,6 +42,7 @@ struct Settings {
     int loop_count = 1;
     int number_of_threads = 4;
     int number_of_warmup_runs = 2;
+    int top_k = 1;
     float input_mean = 0.0f;
     float input_std = 255.0f;
     std::string model_name = "./model.mnn";
@@ -65,6 +66,7 @@ void display_usage() {
         << "--mnn_model, -m: model_name.mnn\n"
         << "--image, -i: image_name.jpg\n"
         << "--classes, -l: classes labels for the model\n"
+        << "--top_k, -k: show top k classes result\n"
         << "--input_mean, -b: input mean\n"
         << "--input_std, -s: input standard deviation\n"
         << "--threads, -t: number of threads\n"
@@ -76,12 +78,23 @@ void display_usage() {
 }
 
 
+//descend order sort for class prediction records
+bool compare_conf(std::pair<uint8_t, float> lpred, std::pair<uint8_t, float> rpred)
+{
+    if (lpred.second < rpred.second)
+        return false;
+    else
+        return true;
+}
+
+
 // CNN Classifier postprocess
 void classifier_postprocess(const Tensor* score_tensor, std::vector<std::pair<uint8_t, float>> &class_results)
 {
-    // 1. do following transform to get the top-1 class index:
+    // 1. do following transform to get sorted class index & score:
     //
-    //    class = np.argmax(pred, axis=-1)
+    //    class = np.argsort(pred, axis=-1)
+    //    class = class[::-1]
     //
     const float* data = score_tensor->host<float>();
     auto unit = sizeof(float);
@@ -92,6 +105,8 @@ void classifier_postprocess(const Tensor* score_tensor, std::vector<std::pair<ui
     auto height  = score_tensor->height();
     auto width   = score_tensor->width();
 
+    // batch size should be always 1
+    assert(batch == 1);
 
     int class_size;
     int bytesPerRow, bytesPerImage, bytesPerBatch;
@@ -135,20 +150,23 @@ void classifier_postprocess(const Tensor* score_tensor, std::vector<std::pair<ui
         const float* bytes = data + b * bytesPerBatch / unit;
         MNN_PRINT("batch %d:\n", b);
 
-        // Get class index with max score,
+        // Get sorted class index & score,
         // just as Python postprocess:
         //
-        // class = np.argmax(pred, axis=-1)
+        // class = np.argsort(pred, axis=-1)
+        // class = class[::-1]
         //
         uint8_t class_index = 0;
         float max_score = 0.0;
         for (int i = 0; i < class_size; i++) {
+            class_results.emplace_back(std::make_pair(i, bytes[i]));
             if (bytes[i] > max_score) {
                 class_index = i;
                 max_score = bytes[i];
             }
         }
-        class_results.emplace_back(std::make_pair(class_index, max_score));
+        // descend sort the class prediction list
+        std::sort(class_results.begin(), class_results.end(), compare_conf);
     }
     return;
 }
@@ -394,16 +412,20 @@ void RunInference(Settings* s) {
 
 
     std::vector<std::pair<uint8_t, float>> class_results;
-    // Do classifier_postprocess to get top-1 class index
+    // Do classifier_postprocess to get sorted class index & scores
     gettimeofday(&start_time, nullptr);
     classifier_postprocess(output_tensor.get(), class_results);
     gettimeofday(&stop_time, nullptr);
     MNN_PRINT("classifier_postprocess time: %lf ms\n", (get_us(stop_time) - get_us(start_time)) / 1000);
 
+    // check class size and top_k
+    MNN_ASSERT(num_classes == class_results.size());
+    MNN_ASSERT(s->top_k <= num_classes);
 
     // Show classification result
     MNN_PRINT("Inferenced class:\n");
-    for(auto class_result : class_results) {
+    for(int i = 0; i < s->top_k; i++) {
+        auto class_result = class_results[i];
         MNN_PRINT("%s: %f\n", classes[class_result.first].c_str(), class_result.second);
     }
 
@@ -423,6 +445,7 @@ int main(int argc, char** argv) {
         {"mnn_model", required_argument, nullptr, 'm'},
         {"image", required_argument, nullptr, 'i'},
         {"classes", required_argument, nullptr, 'l'},
+        {"top_k", required_argument, nullptr, 'k'},
         {"input_mean", required_argument, nullptr, 'b'},
         {"input_std", required_argument, nullptr, 's'},
         {"threads", required_argument, nullptr, 't'},
@@ -436,7 +459,7 @@ int main(int argc, char** argv) {
     int option_index = 0;
 
     c = getopt_long(argc, argv,
-                    "b:c:hi:l:m:s:t:w:", long_options,
+                    "b:c:hi:k:l:m:s:t:w:", long_options,
                     &option_index);
 
     /* Detect the end of the options. */
@@ -452,6 +475,10 @@ int main(int argc, char** argv) {
         break;
       case 'i':
         s.input_img_name = optarg;
+        break;
+      case 'k':
+        s.top_k=
+            strtol(optarg, nullptr, 10);  // NOLINT(runtime/deprecated_fn)
         break;
       case 'l':
         s.classes_file_name = optarg;

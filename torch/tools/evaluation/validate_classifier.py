@@ -157,7 +157,10 @@ def validate_classifier_model_mnn(model_path, image_file, class_names, loop_coun
 
 
 def handle_prediction(prediction, image, class_names):
-    index = np.argmax(prediction[0])
+    indexes = np.argsort(prediction[0])
+    indexes = indexes[::-1]
+    #only pick top-1 class index
+    index = indexes[0]
     score = prediction[0][index]
 
     cv2.putText(image, '{name}:{conf:.3f}'.format(name=class_names[index] if class_names else index, conf=float(score)),
