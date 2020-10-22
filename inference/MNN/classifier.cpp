@@ -335,24 +335,28 @@ void RunInference(Settings* s) {
     inputImage = nullptr;
 
     uint8_t* targetImage = cropedImage;
-    if (input_dim_type == Tensor::CAFFE) {
-        uint8_t* reorderImage = image_reorder(cropedImage, input_width, input_height, input_channel);
+    //if (input_dim_type == Tensor::CAFFE) {
+        //uint8_t* reorderImage = image_reorder(cropedImage, input_width, input_height, input_channel);
 
-        // free croped image
-        stbi_image_free(cropedImage);
-        cropedImage = nullptr;
-        targetImage = reorderImage;
-    }
+        //// free croped image
+        //stbi_image_free(cropedImage);
+        //cropedImage = nullptr;
+        //targetImage = reorderImage;
+    //}
 
     // assume input tensor type is float
     MNN_ASSERT(image_input->getType().code == halide_type_float);
     s->input_floating = true;
 
+    // create a host tensor for input data
+    auto dataTensor = new Tensor(image_input, Tensor::TENSORFLOW);
+    fill_data<float>(dataTensor->host<float>(), targetImage,
+                input_width, input_height, input_channel, s);
+
     // run warm up session
     if (s->loop_count > 1)
         for (int i = 0; i < s->number_of_warmup_runs; i++) {
-            fill_data<float>(image_input->host<float>(), targetImage,
-                input_width, input_height, input_channel, s);
+            image_input->copyFromHostTensor(dataTensor);
             if (net->runSession(session) != NO_ERROR) {
                 MNN_PRINT("Failed to invoke MNN!\n");
             }
@@ -361,8 +365,7 @@ void RunInference(Settings* s) {
     // run model sessions to get output
     gettimeofday(&start_time, nullptr);
     for (int i = 0; i < s->loop_count; i++) {
-        fill_data<float>(image_input->host<float>(), targetImage,
-            input_width, input_height, input_channel, s);
+        image_input->copyFromHostTensor(dataTensor);
         if (net->runSession(session) != NO_ERROR) {
             MNN_PRINT("Failed to invoke MNN!\n");
         }

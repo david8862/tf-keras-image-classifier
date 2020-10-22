@@ -348,11 +348,17 @@ void RunInference(Settings* s) {
     MNN_ASSERT(image_input->getType().code == halide_type_float);
     s->input_floating = true;
 
+    // create a host tensor for input data
+    auto dataTensor = new Tensor(image_input, Tensor::TENSORFLOW);
+    fill_data<float>(dataTensor->host<float>(), targetImage,
+                input_width, input_height, input_channel, s);
+
     // run warm up session
     if (s->loop_count > 1)
         for (int i = 0; i < s->number_of_warmup_runs; i++) {
-            fill_data<float>(image_input->host<float>(), targetImage,
-                input_width, input_height, input_channel, s);
+            image_input->copyFromHostTensor(dataTensor);
+            //fill_data<float>(image_input->host<float>(), targetImage,
+                //input_width, input_height, input_channel, s);
             if (net->runSession(session) != NO_ERROR) {
                 MNN_PRINT("Failed to invoke MNN!\n");
             }
@@ -361,8 +367,9 @@ void RunInference(Settings* s) {
     // run model sessions to get output
     gettimeofday(&start_time, nullptr);
     for (int i = 0; i < s->loop_count; i++) {
-        fill_data<float>(image_input->host<float>(), targetImage,
-            input_width, input_height, input_channel, s);
+        image_input->copyFromHostTensor(dataTensor);
+        //fill_data<float>(image_input->host<float>(), targetImage,
+            //input_width, input_height, input_channel, s);
         if (net->runSession(session) != NO_ERROR) {
             MNN_PRINT("Failed to invoke MNN!\n");
         }
