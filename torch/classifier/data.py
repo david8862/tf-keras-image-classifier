@@ -17,16 +17,16 @@ def get_transform(target_size, mode='train'):
                                transforms.Grayscale(num_output_channels=3),
                                #transforms.RandomRotation(30, resample=False, expand=False, center=None),
                                transforms.ToTensor(),
-                               transforms.Normalize((0.1307,), (0.3081,))
+                               transforms.Normalize((0.5,), (0.5,))
                            ])
     elif mode == 'val' or mode == 'eval':
         transform=transforms.Compose([
-                               transforms.Resize(target_size),
-                               #transforms.CenterCrop(target_size),
+                               #transforms.Resize(target_size),
+                               transforms.CenterCrop(target_size),
                                #transforms.RandomCrop(target_size, padding=0, pad_if_needed=True),
                                transforms.Grayscale(num_output_channels=3),
                                transforms.ToTensor(),
-                               transforms.Normalize((0.1307,), (0.3081,))
+                               transforms.Normalize((0.5,), (0.5,))
                            ])
     else:
         raise ValueError('Unsupported mode ', mode)

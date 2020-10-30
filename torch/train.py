@@ -191,7 +191,7 @@ def main():
         validate(args, model, device, val_loader, epoch, log_dir)
 
     # Finally store model
-    torch.save(model, os.path.join(log_dir, 'trained_final.pt'))
+    torch.save(model, os.path.join(log_dir, 'trained_final.pth'))
     #torch.save(model.state_dict(), os.path.join(log_dir, 'trained_final.pt'))
 
 if __name__ == '__main__':

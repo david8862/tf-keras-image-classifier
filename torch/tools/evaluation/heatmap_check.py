@@ -91,7 +91,7 @@ def generate_heatmap(image_path, model_path, model_input_shape, heatmap_path, cl
 
         # De-normalize tensor to image, and resize
         # for result display
-        img = (img * 78.5545 + 33.3285).astype(np.uint8)
+        img = (img * 128 + 128).astype(np.uint8)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         img = cv2.resize(img, (224, 224))
 

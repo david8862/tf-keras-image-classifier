@@ -163,7 +163,10 @@ def handle_prediction(prediction, image, class_names):
     index = indexes[0]
     score = prediction[0][index]
 
-    cv2.putText(image, '{name}:{conf:.3f}'.format(name=class_names[index] if class_names else index, conf=float(score)),
+    result = '{name}:{conf:.3f}'.format(name=class_names[index] if class_names else index, conf=float(score))
+    print('Class result\n', result)
+
+    cv2.putText(image, result,
                 (10,30),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 fontScale=1,
