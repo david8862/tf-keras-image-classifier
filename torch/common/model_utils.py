@@ -6,6 +6,26 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+def get_lr_scheduler(decay_type, optimizer, decay_steps):
+    """
+    Return a learning rate scheduler
+    """
+    if decay_type:
+        decay_type = decay_type.lower()
+
+    if decay_type == None:
+        lr_scheduler = None
+    elif decay_type == 'cosine':
+        lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=decay_steps, eta_min=0)
+    elif decay_type == 'plateau':
+        lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, mode='min', patience=10, verbose=1, cooldown=0, min_lr=1e-10)
+    elif decay_type == 'exponential':
+        lr_scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+    else:
+        raise ValueError('Unsupported lr decay type')
+
+    return lr_scheduler
+
 
 def get_optimizer(optim_type, model, learning_rate):
     optim_type = optim_type.lower()

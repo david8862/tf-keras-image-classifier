@@ -6,19 +6,18 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
 from torchsummary import summary
 
 from classifier.model import Classifier
 from classifier.data import get_dataloader
-from common.model_utils import get_optimizer
+from common.model_utils import get_optimizer, get_lr_scheduler
 
 
 # global value to record the best accuracy
 best_acc = 0.0
 
 
-def train(args, model, device, train_loader, optimizer):
+def train(args, model, device, train_loader, optimizer, lr_scheduler):
     train_loss = 0.0
     correct = 0.0
     model.train()
@@ -36,6 +35,8 @@ def train(args, model, device, train_loader, optimizer):
         # backward propagation
         loss.backward()
         optimizer.step()
+        if lr_scheduler:
+            lr_scheduler.step()
 
         # collect loss and accuracy
         train_loss += loss.item()
@@ -102,7 +103,6 @@ def main():
                         help='path to train image dataset')
     parser.add_argument('--val_data_path', type=str, required=True,
                         help='path to validation image dataset')
-
     # Training settings
     parser.add_argument('--batch_size', type=int, required=False, default=64,
         help = "batch size for train, default=%(default)s")
@@ -110,7 +110,7 @@ def main():
         help = "optimizer for training (adam/rmsprop/sgd), default=%(default)s")
     parser.add_argument('--learning_rate', type=float, required=False, default=1e-3,
         help = "Initial learning rate, default=%(default)s")
-    parser.add_argument('--decay_type', type=str, required=False, default=None, choices=[None, 'cosine', 'exponential', 'polynomial', 'piecewise_constant'],
+    parser.add_argument('--decay_type', type=str, required=False, default=None, choices=[None, 'cosine', 'plateau', 'exponential'],
         help = "Learning rate decay type, default=%(default)s")
 
     parser.add_argument('--init_epoch', type=int,required=False, default=0,
@@ -150,10 +150,7 @@ def main():
         model.load_state_dict(torch.load(args.weights_path))
         print('Load weights {}.'.format(args.weights_path))
 
-
-    #optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=0.9)
-    optimizer = get_optimizer('sgd', model, args.learning_rate)
-
+    optimizer = get_optimizer(args.optimizer, model, args.learning_rate)
 
     # Freeze feature extractor part for transfer learning
     print('Freeze feature extractor part.')
@@ -172,7 +169,7 @@ def main():
     # Transfer train loop
     for epoch in range(initial_epoch, epochs):
         print('Epoch %d/%d'%(epoch, epochs))
-        train(args, model, device, train_loader, optimizer)
+        train(args, model, device, train_loader, optimizer, None)
         validate(args, model, device, val_loader, epoch, log_dir)
 
 
@@ -183,11 +180,15 @@ def main():
         for param in child.parameters():
             param.requires_grad = True
 
+    # apply learning rate decay only after unfreeze all layers
+    steps_per_epoch = max(1, len(train_loader.dataset)//args.batch_size)
+    decay_steps = steps_per_epoch * (args.total_epoch - args.init_epoch - args.transfer_epoch)
+    lr_scheduler = get_lr_scheduler(args.decay_type, optimizer, decay_steps)
 
     # Fine tune train loop
     for epoch in range(epochs, args.total_epoch):
         print('Epoch %d/%d'%(epoch, args.total_epoch))
-        train(args, model, device, train_loader, optimizer)
+        train(args, model, device, train_loader, optimizer, lr_scheduler)
         validate(args, model, device, val_loader, epoch, log_dir)
 
     # Finally store model
