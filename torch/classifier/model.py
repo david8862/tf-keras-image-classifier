@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from torchvision.models import resnet50
 #from torchvision.models import mobilenet_v2
 from common.backbones.mobilenetv2 import mobilenetv2
 from common.backbones.mobilenetv3 import mobilenetv3_large, mobilenetv3_small
@@ -37,6 +38,18 @@ class Classifier(nn.Module):
             model = mobilenetv3_small(pretrained=True, width_mult=width_mult)
             features_channel = int(96*width_mult)
             features = model.features
+        elif model_type == 'resnet50':
+            model = resnet50(pretrained=True, progress=True)
+            features_channel = 2048
+            features = nn.Sequential(model.conv1,
+                                     model.bn1,
+                                     model.relu,
+                                     model.maxpool,
+                                     model.layer1,
+                                     model.layer2,
+                                     model.layer3,
+                                     model.layer4,
+                                    )
         else:
             raise ValueError('Unsupported model type')
         return features, features_channel
