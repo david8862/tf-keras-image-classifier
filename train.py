@@ -19,8 +19,12 @@ optimize_tf_gpu(tf, K)
 
 def main(args):
     log_dir = 'logs/000'
+
     # get class info
-    class_names = get_classes(args.classes_path)
+    if args.classes_path:
+        class_names = get_classes(args.classes_path)
+    else:
+        class_names = None
 
     # callbacks for training process
     logging = TensorBoard(log_dir=log_dir, histogram_freq=0, write_graph=False, write_grads=False, write_images=False, update_freq='batch')
@@ -43,11 +47,17 @@ def main(args):
     train_generator = get_data_generator(args.train_data_path, args.model_input_shape, args.batch_size, class_names, mode='train')
     val_generator = get_data_generator(args.val_data_path, args.model_input_shape, args.batch_size, class_names, mode='val')
 
+    # check if classes match on train & val dataset
+    assert train_generator.class_indices == val_generator.class_indices, 'class mismatch between train & val dataset'
+    if not class_names:
+        class_names = list(train_generator.class_indices.keys())
+    print('Classes:', class_names)
+
     # prepare optimizer
     optimizer = get_optimizer(args.optimizer, args.learning_rate, decay_type=None)
 
     # get train model
-    model, backbone_len = get_model(args.model_type, class_names, args.model_input_shape, args.head_conv_channel, args.weights_path)
+    model, backbone_len = get_model(args.model_type, len(class_names), args.model_input_shape, args.head_conv_channel, args.weights_path)
     model.summary()
 
     # Freeze backbone part for transfer learning
@@ -126,7 +136,7 @@ if __name__ == '__main__':
         help='path to train image dataset')
     parser.add_argument('--val_data_path', type=str, required=True,
         help='path to validation image dataset')
-    parser.add_argument('--classes_path', type=str, required=True,
+    parser.add_argument('--classes_path', type=str, required=False,
         help='path to classes definition', default=None)
 
     # Training options

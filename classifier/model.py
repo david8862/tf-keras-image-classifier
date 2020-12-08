@@ -36,7 +36,7 @@ def get_base_model(model_type, model_input_shape, weights='imagenet'):
     return model
 
 
-def get_model(model_type, class_names, model_input_shape, head_conv_channel, weights_path=None):
+def get_model(model_type, num_classes, model_input_shape, head_conv_channel, weights_path=None):
     # create the base pre-trained model
     base_model = get_base_model(model_type, model_input_shape)
     backbone_len = len(base_model.layers)
@@ -50,7 +50,7 @@ def get_model(model_type, class_names, model_input_shape, head_conv_channel, wei
     # let's add a fully-connected layer
     #x = Dense(128, activation='relu')(x)
     # and a logistic layer
-    predictions = Dense(len(class_names), activation='softmax')(x)
+    predictions = Dense(num_classes, activation='softmax')(x)
 
     # this is the model we will train
     model = Model(inputs=base_model.input, outputs=predictions)
