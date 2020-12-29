@@ -18,5 +18,5 @@ link_directories("${MNN_ROOT_PATH}/build/")
 add_executable(classifier ${CLASSIFIER_SRC})
 
 target_include_directories(classifier PRIVATE ${MNN_ROOT_PATH}/include/ ${MNN_ROOT_PATH}/3rd_party/imageHelper/)
-target_link_libraries(classifier PRIVATE -lMNN -lstdc++ -lpthread)
+target_link_libraries(classifier PRIVATE -lMNN -lstdc++ -lpthread -ldl)
 #target_link_libraries(classifier PRIVATE libMNN.a -Wl,--whole-archive -Wl,--no-whole-archive -lstdc++ -lpthread)

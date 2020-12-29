@@ -41,8 +41,8 @@ def model_export(model_path, model_input_shape, output_path, batch_size=1):
         print('\nStarting ONNX export with onnx %s...' % onnx.__version__)
         export_file = os.path.join(output_path, model_basename+'.onnx')
 
-        torch.onnx.export(model, img, export_file, verbose=False, opset_version=12, input_names=['data'],
-                          output_names=['fc'])
+        torch.onnx.export(model, img, export_file, verbose=False, opset_version=12, input_names=['image_input'],
+                          output_names=['scores'])
 
         # Checks
         onnx_model = onnx.load(export_file)  # load onnx model
