@@ -13,7 +13,7 @@ from torchsummary import summary
 # add root path of model definition here,
 # to make sure that we can load .pth model file with torch.load()
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
-from common.data_utils import preprocess_image
+from common.data_utils import preprocess_image, denormalize_image
 from common.utils import get_classes
 
 
@@ -91,7 +91,7 @@ def generate_heatmap(image_path, model_path, model_input_shape, heatmap_path, cl
 
         # De-normalize tensor to image, and resize
         # for result display
-        img = (img * 128 + 128).astype(np.uint8)
+        img = denormalize_image(img)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         img = cv2.resize(img, (224, 224))
 

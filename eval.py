@@ -243,7 +243,7 @@ def main():
 
     parser.add_argument(
         '--classes_path', type=str, required=False,
-        help='path to class definitions, default=%(default)s', default=os.path.join('configs' , 'voc_classes.txt'))
+        help='path to class definitions', default=None)
 
     parser.add_argument(
         '--model_input_shape', type=str,
@@ -252,7 +252,11 @@ def main():
     args = parser.parse_args()
 
     # param parse
-    class_names = get_classes(args.classes_path)
+    if args.classes_path:
+        class_names = get_classes(args.classes_path)
+    else:
+        class_names = None
+
     height, width = args.model_input_shape.split('x')
     args.model_input_shape = (int(height), int(width))
 

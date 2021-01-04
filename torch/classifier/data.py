@@ -16,8 +16,8 @@ def get_transform(target_size, mode='train'):
                                #transforms.RandomGrayscale(p=0.1),
                                transforms.Grayscale(num_output_channels=3),
                                #transforms.RandomRotation(30, resample=False, expand=False, center=None),
-                               transforms.ToTensor(),
-                               transforms.Normalize((0.5,), (0.5,))
+                               transforms.ToTensor(), # normalize from (0, 255) to (0, 1)
+                               transforms.Normalize((0.5,), (0.5,)) # normalize from (0, 1) to (-1, 1)
                            ])
     elif mode == 'val' or mode == 'eval':
         transform=transforms.Compose([
@@ -25,8 +25,8 @@ def get_transform(target_size, mode='train'):
                                transforms.CenterCrop(target_size),
                                #transforms.RandomCrop(target_size, padding=0, pad_if_needed=True),
                                transforms.Grayscale(num_output_channels=3),
-                               transforms.ToTensor(),
-                               transforms.Normalize((0.5,), (0.5,))
+                               transforms.ToTensor(), # normalize from (0, 255) to (0, 1)
+                               transforms.Normalize((0.5,), (0.5,)) # normalize from (0, 1) to (-1, 1)
                            ])
     else:
         raise ValueError('Unsupported mode ', mode)

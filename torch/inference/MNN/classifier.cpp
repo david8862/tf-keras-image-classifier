@@ -43,8 +43,8 @@ struct Settings {
     int number_of_threads = 4;
     int number_of_warmup_runs = 2;
     int top_k = 1;
-    float input_mean = 33.3285f;
-    float input_std = 78.5655f;
+    float input_mean = 127.5f;
+    float input_std = 127.5f;
     std::string model_name = "./model.mnn";
     std::string input_img_name = "./dog.jpg";
     std::string classes_file_name = "./classes.txt";

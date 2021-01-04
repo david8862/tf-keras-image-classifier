@@ -32,3 +32,24 @@ def preprocess_image(image, target_size, return_tensor=False):
 
     return image_data
 
+
+def denormalize_image(image, return_tensor=False):
+    """
+    Denormalize image tensor from (-1, 1) to (0, 255)
+
+    # Arguments
+        image: normalized image array or tensor
+            distribution (-1, 1)
+        return_tensor: whether return a PyTorch tensor
+            or numpy array.
+
+    # Returns
+        image_data: numpy array or PyTorch tensor
+                    of image data with distribution (0, 255).
+    """
+    if return_tensor:
+        image_data = (image * 127.5 + 127.5).byte()
+    else:
+        image_data = (image * 127.5 + 127.5).astype(np.uint8)
+
+    return image_data
