@@ -22,6 +22,40 @@ def random_gray(x):
     return x
 
 
+def normalize_image(image):
+    """
+    normalize image array from 0 ~ 255
+    to 0.0 ~ 1.0
+
+    # Arguments
+        image: origin input image
+            numpy image array with dtype=float, 0.0 ~ 255.0
+
+    # Returns
+        image: numpy image array with dtype=float, 0.0 ~ 1.0
+    """
+    image = image / 255.0
+
+    return image
+
+
+def denormalize_image(image):
+    """
+    Denormalize image tensor from 0.0 ~ 1.0
+    back to 0 ~ 255
+
+    # Arguments
+        image: normalized image array,
+            distribution 0.0 ~ 1.0
+
+    # Returns
+        image: numpy image array with dtype=uint8, 0 ~ 255
+    """
+
+    image = np.uint8(255 * image)
+
+    return image
+
 
 def get_data_generator(data_path, model_input_shape, batch_size, class_names, mode='train'):
     if mode == 'train':

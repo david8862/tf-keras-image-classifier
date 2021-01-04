@@ -16,6 +16,7 @@ import tensorflow.keras.backend as K
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
 from common.utils import get_classes, get_custom_objects, optimize_tf_gpu
 from common.preprocess_crop import load_and_crop_img
+from classifier.data import normalize_image, denormalize_image
 
 optimize_tf_gpu(tf, K)
 
@@ -68,7 +69,7 @@ def generate_heatmap(image_path, model_path, heatmap_path, class_names=None):
         target_size=get_target_size(model)
         img = load_and_crop_img(image_file, target_size=target_size, interpolation='nearest:random')
         img = np.array(img)
-        x = img / 255.
+        x = normalize_image(img)
         x = np.expand_dims(x, axis=0)
 
         # predict and get output
@@ -105,7 +106,7 @@ def generate_heatmap(image_path, model_path, heatmap_path, class_names=None):
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         img = cv2.resize(img, (224, 224))
         heatmap = cv2.resize(heatmap, (img.shape[1], img.shape[0]))
-        heatmap = np.uint8(255 * heatmap)
+        heatmap = denormalize_image(heatmap)
         heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
         superimposed_img = heatmap * 0.4 + img
 
@@ -124,7 +125,7 @@ def generate_heatmap(image_path, model_path, heatmap_path, class_names=None):
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description='check heatmap activation for CNN classifer model (h5) with test images')
     parser.add_argument('--model_path', type=str, required=True, help='model file to predict')
     parser.add_argument('--image_path', type=str, required=True, help='Image file or directory to predict')
     parser.add_argument('--classes_path', type=str, required=False, default=None, help='path to class definition, optional')

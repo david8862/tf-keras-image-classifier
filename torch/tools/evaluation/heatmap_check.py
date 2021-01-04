@@ -116,7 +116,7 @@ def generate_heatmap(image_path, model_path, model_input_shape, heatmap_path, cl
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description='check heatmap activation for CNN classifer model (pth) with test images')
     parser.add_argument('--image_path', type=str, required=True, help='Image file or directory to predict')
     parser.add_argument('--model_path', type=str, required=True, help='model file to predict')
     parser.add_argument('--model_input_shape', type=str, required=False, help='model input image shape as <height>x<width>, default=%(default)s', default='224x224')
