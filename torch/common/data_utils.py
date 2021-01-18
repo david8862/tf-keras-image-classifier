@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 # -*- coding=utf-8 -*-
 """Data process utility functions."""
+import numpy as np
 from PIL import Image
 from classifier.data import get_transform
 
