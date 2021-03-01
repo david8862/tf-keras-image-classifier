@@ -37,8 +37,6 @@ def train(args, model, device, train_loader, optimizer, lr_scheduler):
         # backward propagation
         loss.backward()
         optimizer.step()
-        if lr_scheduler:
-            lr_scheduler.step()
 
         # collect loss and accuracy
         train_loss += loss.item()
@@ -47,6 +45,9 @@ def train(args, model, device, train_loader, optimizer, lr_scheduler):
 
         tbar.set_description('Train loss: %06.4f - acc: %06.4f' % (train_loss/(i + 1), correct/((i + 1)*args.batch_size)))
 
+    # decay learning rate every epoch
+    if lr_scheduler:
+        lr_scheduler.step()
 
 
 def validate(args, model, device, val_loader, epoch, log_dir):
@@ -112,7 +113,7 @@ def main():
         help = "optimizer for training (adam/rmsprop/sgd), default=%(default)s")
     parser.add_argument('--learning_rate', type=float, required=False, default=1e-3,
         help = "Initial learning rate, default=%(default)s")
-    parser.add_argument('--decay_type', type=str, required=False, default=None, choices=[None, 'cosine', 'plateau', 'exponential'],
+    parser.add_argument('--decay_type', type=str, required=False, default=None, choices=[None, 'cosine', 'plateau', 'exponential', 'step'],
         help = "Learning rate decay type, default=%(default)s")
 
     parser.add_argument('--init_epoch', type=int,required=False, default=0,
@@ -183,8 +184,10 @@ def main():
             param.requires_grad = True
 
     # apply learning rate decay only after unfreeze all layers
-    steps_per_epoch = max(1, len(train_loader.dataset)//args.batch_size)
-    decay_steps = steps_per_epoch * (args.total_epoch - args.init_epoch - args.transfer_epoch)
+    # NOTE: PyTorch apply learning rate scheduler for every epoch, not batch
+    #steps_per_epoch = max(1, len(train_loader.dataset)//args.batch_size)
+    #decay_steps = steps_per_epoch * (args.total_epoch - args.init_epoch - args.transfer_epoch)
+    decay_steps = args.total_epoch - args.init_epoch - args.transfer_epoch
     lr_scheduler = get_lr_scheduler(args.decay_type, optimizer, decay_steps)
 
     # Fine tune train loop

@@ -21,6 +21,8 @@ def get_lr_scheduler(decay_type, optimizer, decay_steps):
         lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, mode='min', patience=10, verbose=1, cooldown=0, min_lr=1e-10)
     elif decay_type == 'exponential':
         lr_scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+    elif decay_type == 'step':
+        lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1) #decay to gamma*lr every 10 epochs
     else:
         raise ValueError('Unsupported lr decay type')
 
