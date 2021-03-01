@@ -29,15 +29,15 @@ def get_lr_scheduler(decay_type, optimizer, decay_steps):
     return lr_scheduler
 
 
-def get_optimizer(optim_type, model, learning_rate):
+def get_optimizer(optim_type, model, learning_rate, weight_decay):
     optim_type = optim_type.lower()
 
     if optim_type == 'adam':
-        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=0, amsgrad=False)
+        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=weight_decay, amsgrad=False)
     elif optim_type == 'rmsprop':
-        optimizer = optim.RMSprop(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=0, momentum=0, centered=False)
+        optimizer = optim.RMSprop(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=weight_decay, momentum=0, centered=False)
     elif optim_type == 'sgd':
-        optimizer = optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=0, momentum=0.9, nesterov=False)
+        optimizer = optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate, weight_decay=weight_decay, momentum=0.9, nesterov=False)
     else:
         raise ValueError('Unsupported optimizer type')
 

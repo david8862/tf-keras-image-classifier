@@ -16,7 +16,7 @@ import tensorflow.keras.backend as K
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
 from common.utils import get_classes, get_custom_objects, optimize_tf_gpu
 from common.preprocess_crop import load_and_crop_img
-from classifier.data import normalize_image, denormalize_image
+from common.data_utils import normalize_image, denormalize_image
 
 optimize_tf_gpu(tf, K)
 

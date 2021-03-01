@@ -115,6 +115,8 @@ def main():
         help = "Initial learning rate, default=%(default)s")
     parser.add_argument('--decay_type', type=str, required=False, default=None, choices=[None, 'cosine', 'plateau', 'exponential', 'step'],
         help = "Learning rate decay type, default=%(default)s")
+    parser.add_argument('--weight_decay', type=float, required=False, default=5e-4,
+        help = "Weight decay for optimizer, default=%(default)s")
 
     parser.add_argument('--init_epoch', type=int,required=False, default=0,
         help = "Initial training epochs for fine tune training, default=%(default)s")
@@ -153,7 +155,7 @@ def main():
         model.load_state_dict(torch.load(args.weights_path))
         print('Load weights {}.'.format(args.weights_path))
 
-    optimizer = get_optimizer(args.optimizer, model, args.learning_rate)
+    optimizer = get_optimizer(args.optimizer, model, args.learning_rate, args.weight_decay)
 
     # Freeze feature extractor part for transfer learning
     print('Freeze feature extractor part.')
