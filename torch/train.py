@@ -6,6 +6,7 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.tensorboard import SummaryWriter
 from torchsummary import summary
 
 from classifier.model import Classifier
@@ -17,9 +18,9 @@ from common.model_utils import get_optimizer, get_lr_scheduler
 best_acc = 0.0
 
 
-def train(args, model, device, train_loader, optimizer, lr_scheduler):
-    train_loss = 0.0
-    correct = 0.0
+def train(args, epoch, model, device, train_loader, optimizer, lr_scheduler, summary_writer):
+    epoch_loss = 0.0
+    epoch_correct = 0.0
     model.train()
     tbar = tqdm(train_loader)
     for i, (data, target) in enumerate(tbar):
@@ -39,18 +40,25 @@ def train(args, model, device, train_loader, optimizer, lr_scheduler):
         optimizer.step()
 
         # collect loss and accuracy
-        train_loss += loss.item()
-        pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
-        correct += pred.eq(target.view_as(pred)).sum().item()
+        batch_loss = loss.item()
+        epoch_loss += batch_loss
 
-        tbar.set_description('Train loss: %06.4f - acc: %06.4f' % (train_loss/(i + 1), correct/((i + 1)*args.batch_size)))
+        pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
+        batch_correct = pred.eq(target.view_as(pred)).sum().item()
+        epoch_correct += batch_correct
+
+        tbar.set_description('Train loss: %06.4f - acc: %06.4f' % (epoch_loss/(i + 1), epoch_correct/((i + 1)*args.batch_size)))
+
+        # log train loss and accuracy
+        summary_writer.add_scalar('train loss', batch_loss, epoch*len(train_loader)+i)
+        summary_writer.add_scalar('train accuracy', batch_correct/args.batch_size, epoch*len(train_loader)+i)
 
     # decay learning rate every epoch
     if lr_scheduler:
         lr_scheduler.step()
 
 
-def validate(args, model, device, val_loader, epoch, log_dir):
+def validate(args, epoch, step, model, device, val_loader, log_dir, summary_writer):
     global best_acc
     val_loss = 0.0
     correct = 0.0
@@ -74,6 +82,10 @@ def validate(args, model, device, val_loader, epoch, log_dir):
     val_acc = correct / len(val_loader.dataset)
     print('Validate set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)'.format(
         val_loss, correct, len(val_loader.dataset), val_acc))
+
+    # log validation loss and accuracy
+    summary_writer.add_scalar('val loss', val_loss, step)
+    summary_writer.add_scalar('val accuracy', val_acc, step)
 
     # save checkpoint with best accuracy
     if val_acc > best_acc:
@@ -142,6 +154,9 @@ def main():
     train_loader = get_dataloader(args.train_data_path, args.model_input_shape, args.batch_size, use_cuda=use_cuda, mode='train')
     val_loader = get_dataloader(args.val_data_path, args.model_input_shape, args.batch_size, use_cuda=use_cuda, mode='val')
 
+    # get tensorboard summary writer
+    summary_writer = SummaryWriter(os.path.join(log_dir, 'tensorboard'))
+
     # check if classes match on train & val dataset
     assert train_loader.dataset.classes == val_loader.dataset.classes, 'class mismatch between train & val dataset'
     num_classes = len(train_loader.dataset.classes)
@@ -174,8 +189,8 @@ def main():
     # Transfer train loop
     for epoch in range(initial_epoch, epochs):
         print('Epoch %d/%d'%(epoch, epochs))
-        train(args, model, device, train_loader, optimizer, None)
-        validate(args, model, device, val_loader, epoch, log_dir)
+        train(args, epoch, model, device, train_loader, optimizer, None, summary_writer)
+        validate(args, epoch, epoch*len(train_loader), model, device, val_loader, log_dir, summary_writer)
 
 
     # Unfreeze the whole network for further tuning
@@ -195,8 +210,8 @@ def main():
     # Fine tune train loop
     for epoch in range(epochs, args.total_epoch):
         print('Epoch %d/%d'%(epoch, args.total_epoch))
-        train(args, model, device, train_loader, optimizer, lr_scheduler)
-        validate(args, model, device, val_loader, epoch, log_dir)
+        train(args, epoch, model, device, train_loader, optimizer, lr_scheduler, summary_writer)
+        validate(args, epoch, epoch*len(train_loader), model, device, val_loader, log_dir, summary_writer)
 
     # Finally store model
     torch.save(model, os.path.join(log_dir, 'trained_final.pth'))
