@@ -212,3 +212,12 @@ def peleenet(**kwargs):
 
     return model
 
+
+if __name__ == '__main__':
+    model = peleenet(pretrained=True)
+
+    from torchsummary import summary
+    summary(model, input_size=(3,224,224))
+
+    #torch.save(model, 'check.pth')
+
