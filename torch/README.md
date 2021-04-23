@@ -7,6 +7,7 @@ An end-to-end CNN image classification model training framework. Implement with 
 #### Model Type
 - [x] MobileNetV2
 - [x] MobilenetV3(Large/Small)
+- [x] PeleeNet ([paper](https://arxiv.org/abs/1804.06882))
 - [x] ResNet50
 
 

@@ -8,6 +8,7 @@ from torchvision.models import resnet50
 #from torchvision.models import mobilenet_v2
 from common.backbones.mobilenetv2 import mobilenetv2
 from common.backbones.mobilenetv3 import mobilenetv3_large, mobilenetv3_small
+from common.backbones.peleenet import peleenet
 
 
 class Classifier(nn.Module):
@@ -37,6 +38,10 @@ class Classifier(nn.Module):
             width_mult=0.75
             model = mobilenetv3_small(pretrained=True, width_mult=width_mult)
             features_channel = int(96*width_mult)
+            features = model.features
+        elif model_type == 'peleenet':
+            model = peleenet(pretrained=True, weights_path=None)
+            features_channel = 704
             features = model.features
         elif model_type == 'resnet50':
             model = resnet50(pretrained=True, progress=True)
