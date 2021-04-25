@@ -31,9 +31,9 @@ def train(args, epoch, model, device, train_loader, optimizer, lr_scheduler, sum
 
         # calculate loss
         #loss = F.cross_entropy(output, target)
-        #loss = F.nll_loss(output, target)
+        #loss = F.nll_loss(torch.log(output), target)
         #loss = nn.CrossEntropyLoss()(output, target)
-        loss = nn.NLLLoss()(output, target)
+        loss = nn.NLLLoss()(torch.log(output), target)
 
         # backward propagation
         loss.backward()
@@ -73,12 +73,12 @@ def validate(args, epoch, step, model, device, val_loader, log_dir, summary_writ
 
             # collect loss and accuracy
             #val_loss += F.cross_entropy(output, target, reduction='sum').item() / args.batch_size # sum up batch loss
-            val_loss += F.nll_loss(output, target, reduction='sum').item() # sum up batch loss
+            val_loss += F.nll_loss(torch.log(output), target, reduction='sum').item() # sum up batch loss
             pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
             tbar.set_description('Validate loss: %06.4f - acc: %06.4f' % (val_loss/((i + 1)*args.batch_size), correct/((i + 1)*args.batch_size)))
 
-    val_loss /= (len(val_loader.dataset) / args.batch_size)
+    val_loss /= len(val_loader.dataset)
     val_acc = correct / len(val_loader.dataset)
     print('Validate set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)'.format(
         val_loss, correct, len(val_loader.dataset), val_acc))

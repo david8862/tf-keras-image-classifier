@@ -64,8 +64,8 @@ class Classifier(nn.Module):
         x = F.adaptive_avg_pool2d(x, 1)
         x = x.view(-1, self.head_conv_channel)
         x = self.fc(x)
-        x = F.log_softmax(x, dim=1)
-        #x = F.softmax(x, dim=1)
+        #x = F.log_softmax(x, dim=1)
+        x = F.softmax(x, dim=1)
         return x
 
     def forward(self, x):
