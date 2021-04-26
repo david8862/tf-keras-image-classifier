@@ -19,16 +19,17 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 optimize_tf_gpu(tf, K)
 
 
-def predict_keras(model, data, target):
-    pred = model.predict(data)
-    pred = np.argmax(pred, axis=-1)
+def predict_keras(model, data, target, class_index):
+    output = model.predict(data)
+    pred = np.argmax(output, axis=-1)
     target = np.argmax(target, axis=-1)
     correct = float(np.equal(pred, target).astype(np.int).sum())
 
-    return correct
+    class_score = output[:, class_index]
+    return correct, class_score
 
 
-def predict_pb(model, data, target):
+def predict_pb(model, data, target, class_index):
     # NOTE: TF 1.x frozen pb graph need to specify input/output tensor name
     # so we need to hardcode the input/output tensor names here to get them from model
     output_tensor_name = 'graph/dense/Softmax:0'
@@ -41,36 +42,38 @@ def predict_pb(model, data, target):
     output_tensor = model.get_tensor_by_name(output_tensor_name)
 
     with tf.Session(graph=model) as sess:
-        pred = sess.run(output_tensor, feed_dict={
+        output = sess.run(output_tensor, feed_dict={
             image_input: data
         })
-    pred = np.argmax(pred, axis=-1)
+    pred = np.argmax(output, axis=-1)
     target = np.argmax(target, axis=-1)
     correct = float(np.equal(pred, target).astype(np.int).sum())
 
-    return correct
+    class_score = output[:, class_index]
+    return correct, class_score
 
 
-def predict_tflite(interpreter, data, target):
+def predict_tflite(interpreter, data, target, class_index):
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
 
     interpreter.set_tensor(input_details[0]['index'], data)
     interpreter.invoke()
 
-    pred = []
+    output = []
     for output_detail in output_details:
         output_data = interpreter.get_tensor(output_detail['index'])
-        pred.append(output_data)
+        output.append(output_data)
 
-    pred = np.argmax(pred[0], axis=-1)
+    pred = np.argmax(output[0], axis=-1)
     target = np.argmax(target, axis=-1)
     correct = float(np.equal(pred, target).astype(np.int).sum())
 
-    return correct
+    class_score = output[0][:, class_index]
+    return correct, class_score
 
 
-def predict_onnx(model, data, target):
+def predict_onnx(model, data, target, class_index):
 
     input_tensors = []
     for i, input_tensor in enumerate(model.get_inputs()):
@@ -79,16 +82,17 @@ def predict_onnx(model, data, target):
     assert len(input_tensors) == 1, 'invalid input tensor number.'
 
     feed = {input_tensors[0].name: data}
-    pred = model.run(None, feed)
+    output = model.run(None, feed)
 
-    pred = np.argmax(pred, axis=-1)
+    pred = np.argmax(output, axis=-1)
     target = np.argmax(target, axis=-1)
     correct = float(np.equal(pred, target).astype(np.int).sum())
 
-    return correct
+    class_score = output[0][:, class_index]
+    return correct, class_score
 
 
-def predict_mnn(interpreter, session, data, target):
+def predict_mnn(interpreter, session, data, target, class_index):
     from functools import reduce
     from operator import mul
 
@@ -107,7 +111,7 @@ def predict_mnn(interpreter, session, data, target):
     input_tensor.copyFrom(tmp_input)
     interpreter.runSession(session)
 
-    pred = []
+    output = []
     # we only handle single output model
     output_tensor = interpreter.getSessionOutput(session)
     output_shape = output_tensor.getShape()
@@ -124,17 +128,44 @@ def predict_mnn(interpreter, session, data, target):
 
     output_data = np.array(tmp_output.getData(), dtype=float).reshape(output_shape)
 
-    pred.append(output_data)
-    pred = np.argmax(pred[0], axis=-1)
+    output.append(output_data)
+    pred = np.argmax(output[0], axis=-1)
     target = np.argmax(target, axis=-1)
     correct = float(np.equal(pred, target).astype(np.int).sum())
 
-    return correct
+    class_score = output[0][:, class_index]
+    return correct, class_score
 
 
+def threshold_search(class_scores, class_labels, class_index):
+    '''
+    walk through the score list to get a best threshold
+    which can make highest accuracy
+    '''
+    class_scores = np.asarray(class_scores)
+    class_labels = np.asarray(class_labels)
+    best_accuracy = 0
+    best_threshold = 0
 
-def evaluate_accuracy(model, model_format, eval_generator):
+    for i in range(len(class_scores)):
+        # choose one score as threshold
+        threshold = class_scores[i]
+        # check predict label under this threshold
+        y_pred = (class_scores >= threshold)
+        accuracy = np.mean((y_pred == (class_labels == class_index).astype(int)).astype(int))
+
+        # record best accuracy and threshold
+        if accuracy > best_accuracy:
+            best_accuracy = accuracy
+            best_threshold = threshold
+
+    return (best_accuracy, best_threshold)
+
+
+def evaluate_accuracy(model, model_format, eval_generator, class_index):
     correct = 0.0
+    class_scores = []
+    class_labels = []
 
     if model_format == 'MNN':
         #MNN inference engine need create session
@@ -146,21 +177,30 @@ def evaluate_accuracy(model, model_format, eval_generator):
         data, target = eval_generator.next()
         # normal keras h5 model
         if model_format == 'H5':
-            correct += predict_keras(model, data, target)
+            tmp_correct, class_score = predict_keras(model, data, target, class_index)
+            correct += tmp_correct
         # support of TF 1.x frozen pb model
         elif model_format == 'PB':
-            correct += predict_pb(model, data, target)
+            tmp_correct, class_score = predict_pb(model, data, target, class_index)
+            correct += tmp_correct
         # support of tflite model
         elif model_format == 'TFLITE':
-            correct += predict_tflite(model, data, target)
+            tmp_correct, class_score = predict_tflite(model, data, target, class_index)
+            correct += tmp_correct
         # support of ONNX model
         elif model_format == 'ONNX':
-            correct += predict_onnx(model, data, target)
+            tmp_correct, class_score = predict_onnx(model, data, target, class_index)
+            correct += tmp_correct
         # support of MNN model
         elif model_format == 'MNN':
-            correct += predict_mnn(model, session, data, target)
+            tmp_correct, class_score = predict_mnn(model, session, data, target, class_index)
+            correct += tmp_correct
         else:
             raise ValueError('invalid model format')
+
+        # record score & labels for specified class
+        class_scores.append(float(class_score))
+        class_labels.append(int(np.argmax(target, axis=-1)))
 
         pbar.set_description('Evaluate acc: %06.4f' % (correct/((i + 1)*(eval_generator.batch_size))))
         pbar.update(1)
@@ -170,6 +210,11 @@ def evaluate_accuracy(model, model_format, eval_generator):
     print('Test set accuracy: {}/{} ({:.2f}%)'.format(
         correct, eval_generator.samples, val_acc))
 
+    # search for a best score threshold on one class
+    accuracy, threshold = threshold_search(class_scores, class_labels, class_index)
+    print('Best accuracy for class[{}]: {:.4f}, with score threshold {:.4f}'.format(class_index, accuracy, threshold))
+
+    return val_acc
 
 
 #load TF 1.x frozen pb graph
@@ -249,6 +294,10 @@ def main():
         '--model_input_shape', type=str,
         help='model image input size as <height>x<width>, default=%(default)s', default='224x224')
 
+    parser.add_argument(
+        '--class_index', type=int, required=False,
+        help='class index to check the best threshold, default=%(default)s', default=0)
+
     args = parser.parse_args()
 
     # param parse
@@ -268,7 +317,7 @@ def main():
     eval_generator = get_data_generator(args.dataset_path, args.model_input_shape, batch_size, class_names, mode='eval')
 
     start = time.time()
-    evaluate_accuracy(model, model_format, eval_generator)
+    evaluate_accuracy(model, model_format, eval_generator, args.class_index)
     end = time.time()
     print("Evaluation time cost: {:.6f}s".format(end - start))
 

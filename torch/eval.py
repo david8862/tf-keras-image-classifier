@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding=utf-8 -*-
-import os, sys, argparse
+import os, sys, argparse, time
 import numpy as np
 from tqdm import tqdm
 
@@ -133,7 +133,7 @@ def evaluate(model, model_format, device, eval_loader, class_index, batch_size):
             correct += tmp_correct
         # support of ONNX model
         elif model_format == 'ONNX':
-            tmp_correct, class_score =  predict_onnx(model, data, target, class_index)
+            tmp_correct, class_score = predict_onnx(model, data, target, class_index)
             correct += tmp_correct
         # support of MNN model
         elif model_format == 'MNN':
@@ -216,7 +216,8 @@ def main():
     torch.manual_seed(1)
 
     # prepare eval dataset loader
-    eval_loader = get_dataloader(args.dataset_path, args.model_input_shape, batch_size=1, use_cuda=use_cuda, mode='eval')
+    batch_size = 1
+    eval_loader = get_dataloader(args.dataset_path, args.model_input_shape, batch_size=batch_size, use_cuda=use_cuda, mode='eval')
 
     num_classes = len(eval_loader.dataset.classes)
     print('Classes:', eval_loader.dataset.classes)
@@ -224,8 +225,11 @@ def main():
     # get eval model
     model, model_format = load_eval_model(args.model_path, device)
 
-    acc = evaluate(model, model_format, device, eval_loader, args.class_index, batch_size=1)
+    start = time.time()
+    acc = evaluate(model, model_format, device, eval_loader, args.class_index, batch_size=batch_size)
     #print("%.5f" % acc)
+    end = time.time()
+    print("Evaluation time cost: {:.6f}s".format(end - start))
 
 
 if __name__ == '__main__':
