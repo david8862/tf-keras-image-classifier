@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# PyTorch implementation of peleenet,
+# PyTorch implementation of PeleeNet,
 # ported from official repo https://github.com/Robert-JunWang/PeleeNet
 #
 import torch
