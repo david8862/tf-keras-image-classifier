@@ -5,6 +5,7 @@ opencv-python
 opencv-contrib-python
 torch
 torchvision
+torchsummary
 matplotlib
 tqdm
 pillow
