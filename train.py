@@ -54,7 +54,7 @@ def main(args):
     print('Classes:', class_names)
 
     # prepare optimizer
-    optimizer = get_optimizer(args.optimizer, args.learning_rate, decay_type=None)
+    optimizer = get_optimizer(args.optimizer, args.learning_rate, average_type=None, decay_type=None)
 
     # get train model
     model, backbone_len = get_model(args.model_type, len(class_names), args.model_input_shape, args.head_conv_channel, args.weights_path)
@@ -92,7 +92,7 @@ def main(args):
         callbacks.remove(reduce_lr)
         steps_per_epoch = max(1, train_generator.samples//args.batch_size)
         decay_steps = steps_per_epoch * (args.total_epoch - args.init_epoch - args.transfer_epoch)
-        optimizer = get_optimizer(args.optimizer, args.learning_rate, decay_type=args.decay_type, decay_steps=decay_steps)
+        optimizer = get_optimizer(args.optimizer, args.learning_rate, average_type=None, decay_type=args.decay_type, decay_steps=decay_steps)
 
 
     # Unfreeze the whole network for further tuning
