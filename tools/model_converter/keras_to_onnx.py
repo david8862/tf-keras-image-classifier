@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Script to convert YOLO keras model to ONNX model
+Script to convert keras model to ONNX model
 """
-import os
-import sys
-import argparse
+import os, sys, argparse
 import shutil
 import subprocess
 import tensorflow as tf
@@ -50,7 +48,7 @@ def onnx_convert_with_savedmodel(keras_model_file, output_file, op_set):
 
 
 def main():
-    parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS, description='Convert YOLO tf.keras model to ONNX model')
+    parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS, description='Convert tf.keras model to ONNX model')
     parser.add_argument('--keras_model_file', required=True, type=str, help='path to keras model file')
     parser.add_argument('--output_file', required=True, type=str, help='output onnx model file')
     parser.add_argument('--op_set', required=False, type=int, help='onnx op set, default=%(default)s', default=10)
