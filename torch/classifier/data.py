@@ -13,7 +13,7 @@ def get_transform(target_size, mode='train'):
                                #transforms.RandomResizedCrop(target_size, scale=(0.5, 1.0), ratio=(0.75, 1.33), interpolation=2),
 
                                transforms.ColorJitter(brightness=0.5, contrast=0.3, saturation=0.3, hue=0.3),
-                               transforms.GaussianBlur(kernel_size=21, sigma=(0.1, 2.0)),
+                               transforms.RandomApply([transforms.GaussianBlur(kernel_size=21, sigma=(0.1, 2.0))], p=0.2),
                                #transforms.RandomGrayscale(p=0.1),
                                transforms.Grayscale(num_output_channels=3),
 
