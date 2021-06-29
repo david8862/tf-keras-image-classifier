@@ -10,6 +10,7 @@ from common.backbones.mobilenetv2 import mobilenetv2
 from common.backbones.mobilenetv3 import mobilenetv3_large, mobilenetv3_small
 from common.backbones.peleenet import peleenet
 from common.backbones.csppeleenet import csppeleenet
+from common.backbones.ghostnet import ghostnet
 
 
 class Classifier(nn.Module):
@@ -50,6 +51,10 @@ class Classifier(nn.Module):
             features = nn.Sequential(model.stem,
                                      model.stages,
                                     )
+        elif model_type == 'ghostnet':
+            model = ghostnet(pretrained=True, weights_path=None)
+            features_channel = 160
+            features = model.features
         elif model_type == 'resnet50':
             model = resnet50(pretrained=True, progress=True)
             features_channel = 2048
