@@ -102,7 +102,7 @@ def SqueezeExcite(input_x, se_ratio=0.25, reduced_base_chs=None, divisor=4, name
 
     x = Conv2D(filters=reduce_chs, kernel_size=1, use_bias=True, name=name+'_conv_reduce')(x)
     x = ReLU(name=name+'_act')(x)
-    x = Conv2D(filters=input_x.shape[-1], kernel_size=1, use_bias=True, name=name+'_conv_expand')(x)
+    x = Conv2D(filters=int(input_x.shape[-1]), kernel_size=1, use_bias=True, name=name+'_conv_expand')(x)
 
     x = Activation(hard_sigmoid, name=name+'_hard_sigmoid')(x)
     x = Multiply()([input_x, x])
