@@ -13,6 +13,7 @@ from classifier.model import get_model
 from classifier.data import get_data_generator
 from common.utils import get_classes, optimize_tf_gpu
 from common.model_utils import get_optimizer
+from common.callbacks import CheckpointCleanCallBack
 
 optimize_tf_gpu(tf, K)
 
@@ -38,10 +39,11 @@ def main(args):
     reduce_lr = ReduceLROnPlateau(monitor='val_acc', mode='max', factor=0.5, patience=10, verbose=1, cooldown=0, min_lr=1e-10)
     early_stopping = EarlyStopping(monitor='val_acc', mode='max', min_delta=0, patience=50, verbose=1)
     terminate_on_nan = TerminateOnNaN()
+    checkpoint_clean = CheckpointCleanCallBack(log_dir, max_keep=5)
     #learn_rates = [0.05, 0.01, 0.005, 0.001, 0.0005]
     #lr_scheduler = LearningRateScheduler(lambda epoch: learn_rates[epoch // 30])
 
-    callbacks=[logging, checkpoint, reduce_lr, early_stopping, terminate_on_nan]
+    callbacks = [logging, checkpoint, reduce_lr, early_stopping, terminate_on_nan, checkpoint_clean]
 
     # prepare train&val data generator
     train_generator = get_data_generator(args.train_data_path, args.model_input_shape, args.batch_size, class_names, mode='train')

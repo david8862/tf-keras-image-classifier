@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding=utf-8 -*-
 import os, sys, argparse
+import glob
 from tqdm import tqdm
 
 import torch
@@ -16,6 +17,15 @@ from common.model_utils import get_optimizer, get_lr_scheduler
 
 # global value to record the best accuracy
 best_acc = 0.0
+
+
+def checkpoint_clean(checkpoint_dir, max_keep=5):
+    # filter out eval checkpoints and val checkpoints
+    all_checkpoints = sorted(glob.glob(os.path.join(checkpoint_dir, 'ep*.pth')))
+
+    # keep latest checkpoints
+    for checkpoint in checkpoints[:-(max_keep)]:
+        os.remove(checkpoint)
 
 
 def train(args, epoch, model, device, train_loader, optimizer, lr_scheduler, summary_writer):
@@ -191,6 +201,7 @@ def main():
         print('Epoch %d/%d'%(epoch, epochs))
         train(args, epoch, model, device, train_loader, optimizer, None, summary_writer)
         validate(args, epoch, epoch*len(train_loader), model, device, val_loader, log_dir, summary_writer)
+        checkpoint_clean(log_dir, max_keep=5)
 
 
     # Unfreeze the whole network for further tuning
@@ -212,6 +223,7 @@ def main():
         print('Epoch %d/%d'%(epoch, args.total_epoch))
         train(args, epoch, model, device, train_loader, optimizer, lr_scheduler, summary_writer)
         validate(args, epoch, epoch*len(train_loader), model, device, val_loader, log_dir, summary_writer)
+        checkpoint_clean(log_dir, max_keep=5)
 
     # Finally store model
     torch.save(model, os.path.join(log_dir, 'trained_final.pth'))
