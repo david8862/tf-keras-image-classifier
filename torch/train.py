@@ -177,7 +177,7 @@ def main():
     summary(model, input_size=(3,)+args.model_input_shape)
 
     if args.weights_path:
-        model.load_state_dict(torch.load(args.weights_path))
+        model.load_state_dict(torch.load(args.weights_path, map_location=device))
         print('Load weights {}.'.format(args.weights_path))
 
     optimizer = get_optimizer(args.optimizer, model, args.learning_rate, args.weight_decay)
