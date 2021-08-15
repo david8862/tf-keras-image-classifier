@@ -63,9 +63,13 @@ def train(args, epoch, model, device, train_loader, optimizer, lr_scheduler, sum
         summary_writer.add_scalar('train loss', batch_loss, epoch*len(train_loader)+i)
         summary_writer.add_scalar('train accuracy', batch_correct/args.batch_size, epoch*len(train_loader)+i)
 
+    epoch_loss /= len(train_loader)
     # decay learning rate every epoch
     if lr_scheduler:
-        lr_scheduler.step()
+        if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+            lr_scheduler.step(epoch_loss)
+        else:
+            lr_scheduler.step()
 
 
 def validate(args, epoch, step, model, device, val_loader, log_dir, summary_writer):
