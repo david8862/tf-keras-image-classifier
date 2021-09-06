@@ -56,7 +56,7 @@ def get_model(model_type, num_classes, model_input_shape, head_conv_channel, wei
     # let's add a fully-connected layer
     #x = Dense(128, activation='relu')(x)
     # and a logistic layer
-    predictions = Dense(num_classes, activation='softmax')(x)
+    predictions = Dense(num_classes, activation='softmax', name='score_predict')(x)
 
     # this is the model we will train
     model = Model(inputs=base_model.input, outputs=predictions)
