@@ -69,7 +69,7 @@ def predict_mnn(interpreter, session, data, target, class_index):
     tmp_input_shape = (batch, channel, height, width)
     input_elementsize = reduce(mul, tmp_input_shape)
     tmp_input = MNN.Tensor(tmp_input_shape, input_tensor.getDataType(),\
-                    tuple(image_data.reshape(input_elementsize, -1)), MNN.Tensor_DimensionType_Caffe)
+                    tuple(data.reshape(input_elementsize, -1)), MNN.Tensor_DimensionType_Caffe)
 
     input_tensor.copyFrom(tmp_input)
     interpreter.runSession(session)
