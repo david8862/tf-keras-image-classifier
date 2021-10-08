@@ -116,9 +116,14 @@ def validate_classifier_model_mnn(model_path, image_file, class_names, loop_coun
     image_data = np.expand_dims(image_data, axis=0)
 
 
-    # use a temp tensor to copy data
-    tmp_input = MNN.Tensor(input_shape, input_tensor.getDataType(),\
-                    image_data, input_tensor.getDimensionType())
+    # create a temp tensor to copy data,
+    # use Caffe NCHW layout to align with image data array
+    # TODO: currently MNN python binding have mem leak when creating MNN.Tensor
+    # from numpy array, only from tuple is good. So we convert input image to tuple
+    tmp_input_shape = (batch, channel, height, width)
+    input_elementsize = reduce(mul, tmp_input_shape)
+    tmp_input = MNN.Tensor(tmp_input_shape, input_tensor.getDataType(),\
+                    tuple(image_data.reshape(input_elementsize, -1)), MNN.Tensor_DimensionType_Caffe)
 
     # predict once first to bypass the model building time
     input_tensor.copyFrom(tmp_input)

@@ -19,7 +19,7 @@ from common.utils import get_classes, get_custom_objects
 from common.preprocess_crop import load_and_crop_img
 
 
-def validate_classifier_model(model_path, image_file, class_names, model_image_size, loop_count):
+def validate_classifier_model(model_path, image_file, class_names, model_input_shape, loop_count):
     # load model
     custom_object_dict = get_custom_objects()
     model = load_model(model_path, compile=False, custom_objects=custom_object_dict)
@@ -32,7 +32,7 @@ def validate_classifier_model(model_path, image_file, class_names, model_image_s
 
     # prepare input image
     ori_img = Image.open(image_file)
-    img = load_and_crop_img(image_file, target_size=model_image_size, interpolation='nearest:center')
+    img = load_and_crop_img(image_file, target_size=model_input_shape, interpolation='nearest:center')
     image_data = np.array(img, dtype=np.float32) / 255.
     image_data = np.expand_dims(image_data, axis=0)
 
@@ -60,7 +60,7 @@ def validate_classifier_model_onnx(model_path, image_file, class_names, loop_cou
     assert len(input_tensors) == 1, 'invalid input tensor number.'
 
     batch, height, width, channel = input_tensors[0].shape
-    model_image_size = (height, width)
+    model_input_shape = (height, width)
 
     output_tensors = []
     for i, output_tensor in enumerate(sess.get_outputs()):
@@ -75,7 +75,7 @@ def validate_classifier_model_onnx(model_path, image_file, class_names, loop_cou
 
     # prepare input image
     ori_img = Image.open(image_file)
-    img = load_and_crop_img(image_file, target_size=model_image_size, interpolation='nearest:center')
+    img = load_and_crop_img(image_file, target_size=model_input_shape, interpolation='nearest:center')
     image_data = np.array(img, dtype=np.float32) / 255.
     image_data = np.expand_dims(image_data, axis=0)
 
@@ -111,19 +111,24 @@ def validate_classifier_model_mnn(model_path, image_file, class_names, loop_coun
         # should be MNN.Tensor_DimensionType_Caffe_C4, unsupported now
         raise ValueError('unsupported input tensor dimension type')
 
-    model_image_size = (height, width)
+    model_input_shape = (height, width)
 
 
     # prepare input image
     ori_img = Image.open(image_file)
-    img = load_and_crop_img(image_file, target_size=model_image_size, interpolation='nearest:center')
+    img = load_and_crop_img(image_file, target_size=model_input_shape, interpolation='nearest:center')
     image_data = np.array(img, dtype=np.float32) / 255.
     image_data = np.expand_dims(image_data, axis=0)
 
 
-    # use a temp tensor to copy data
-    tmp_input = MNN.Tensor(input_shape, input_tensor.getDataType(),\
-                    image_data, input_tensor.getDimensionType())
+    # create a temp tensor to copy data,
+    # use TF NHWC layout to align with image data array
+    # TODO: currently MNN python binding have mem leak when creating MNN.Tensor
+    # from numpy array, only from tuple is good. So we convert input image to tuple
+    tmp_input_shape = (batch, height, width, channel)
+    input_elementsize = reduce(mul, tmp_input_shape)
+    tmp_input = MNN.Tensor(tmp_input_shape, input_tensor.getDataType(),\
+                    tuple(image_data.reshape(input_elementsize, -1)), MNN.Tensor_DimensionType_Tensorflow)
 
     # predict once first to bypass the model building time
     input_tensor.copyFrom(tmp_input)
@@ -156,7 +161,7 @@ def validate_classifier_model_mnn(model_path, image_file, class_names, loop_coun
     output_tensor.copyToHostTensor(tmp_output)
 
     output_data = np.array(tmp_output.getData(), dtype=float).reshape(output_shape)
-    # our postprocess code based on TF channel last format, so if the output format
+    # our postprocess code based on TF NHWC layout, so if the output format
     # doesn't match, we need to transpose
     if output_tensor.getDimensionType() == MNN.Tensor_DimensionType_Caffe:
         output_data = output_data.transpose((0,2,3,1))
@@ -219,7 +224,7 @@ def validate_classifier_model_pb(model_path, image_file, class_names, loop_count
     output_tensor = graph.get_tensor_by_name(output_tensor_name)
 
     batch, height, width, channel = image_input.shape
-    model_image_size = (int(height), int(width))
+    model_input_shape = (int(height), int(width))
 
     num_classes = output_tensor.shape[-1]
     if class_names:
@@ -229,7 +234,7 @@ def validate_classifier_model_pb(model_path, image_file, class_names, loop_count
 
     # prepare input image
     ori_img = Image.open(image_file)
-    img = load_and_crop_img(image_file, target_size=model_image_size, interpolation='nearest:center')
+    img = load_and_crop_img(image_file, target_size=model_input_shape, interpolation='nearest:center')
     image_data = np.array(img, dtype=np.float32) / 255.
     image_data = np.expand_dims(image_data, axis=0)
 
@@ -269,7 +274,7 @@ def validate_classifier_model_tflite(model_path, image_file, class_names, loop_c
 
     height = input_details[0]['shape'][1]
     width = input_details[0]['shape'][2]
-    model_image_size = (height, width)
+    model_input_shape = (height, width)
 
     num_classes = output_details[0]['shape'][-1]
     if class_names:
@@ -278,7 +283,7 @@ def validate_classifier_model_tflite(model_path, image_file, class_names, loop_c
 
     # prepare input image
     ori_img = Image.open(image_file)
-    img = load_and_crop_img(image_file, target_size=model_image_size, interpolation='nearest:center')
+    img = load_and_crop_img(image_file, target_size=model_input_shape, interpolation='nearest:center')
     image_data = np.array(img, dtype=np.float32) / 255.
     image_data = np.expand_dims(image_data, axis=0)
 
@@ -328,7 +333,7 @@ def main():
     parser.add_argument('--model_path', help='model file to predict', type=str, required=True)
 
     parser.add_argument('--image_file', help='image file to predict', type=str, required=True)
-    parser.add_argument('--model_image_size', help='model image input size as <height>x<width>, default=%(default)s', type=str, default='224x224')
+    parser.add_argument('--model_input_shape', help='model image input shape as <height>x<width>, default=%(default)s', type=str, default='224x224')
     parser.add_argument('--classes_path', help='path to class name definitions', type=str, required=False)
     parser.add_argument('--loop_count', help='loop inference for certain times', type=int, default=1)
 
@@ -339,8 +344,8 @@ def main():
         class_names = get_classes(args.classes_path)
 
     # param parse
-    height, width = args.model_image_size.split('x')
-    model_image_size = (int(height), int(width))
+    height, width = args.model_input_shape.split('x')
+    model_input_shape = (int(height), int(width))
 
     # support of tflite model
     if args.model_path.endswith('.tflite'):
@@ -356,7 +361,7 @@ def main():
         validate_classifier_model_onnx(args.model_path, args.image_file, class_names, args.loop_count)
     # normal keras h5 model
     elif args.model_path.endswith('.h5'):
-        validate_classifier_model(args.model_path, args.image_file, class_names, model_image_size, args.loop_count)
+        validate_classifier_model(args.model_path, args.image_file, class_names, model_input_shape, args.loop_count)
     else:
         raise ValueError('invalid model file')
 
