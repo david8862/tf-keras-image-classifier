@@ -81,6 +81,16 @@ def predict_onnx(model, data, target, class_index):
     # assume only 1 input tensor for image
     assert len(input_tensors) == 1, 'invalid input tensor number.'
 
+    # check if input layout is NHWC or NCHW
+    if input_tensors[0].shape[1] == 3:
+        batch, channel, height, width = input_tensors[0].shape  #NCHW
+    else:
+        batch, height, width, channel = input_tensors[0].shape  #NHWC
+
+    if input_tensors[0].shape[1] == 3:
+        # transpose image for NCHW layout
+        data = data.transpose((0,3,1,2))
+
     feed = {input_tensors[0].name: data}
     output = model.run(None, feed)
 
