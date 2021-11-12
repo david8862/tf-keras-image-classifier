@@ -31,7 +31,7 @@ def validate_classifier_model(model_path, image_file, class_names, model_input_s
         assert num_classes == len(class_names), 'classes number mismatch with model.'
 
     # prepare input image
-    ori_img = Image.open(image_file)
+    ori_img = Image.open(image_file).convert('RGB')
     img = load_and_crop_img(image_file, target_size=model_input_shape, interpolation='nearest:center')
     image_data = np.array(img, dtype=np.float32) / 255.
     image_data = np.expand_dims(image_data, axis=0)
@@ -81,7 +81,7 @@ def validate_classifier_model_onnx(model_path, image_file, class_names, loop_cou
         assert num_classes == len(class_names), 'classes number mismatch with model.'
 
     # prepare input image
-    ori_img = Image.open(image_file)
+    ori_img = Image.open(image_file).convert('RGB')
     img = load_and_crop_img(image_file, target_size=model_input_shape, interpolation='nearest:center')
     image_data = np.array(img, dtype=np.float32) / 255.
     image_data = np.expand_dims(image_data, axis=0)
@@ -126,7 +126,7 @@ def validate_classifier_model_mnn(model_path, image_file, class_names, loop_coun
 
 
     # prepare input image
-    ori_img = Image.open(image_file)
+    ori_img = Image.open(image_file).convert('RGB')
     img = load_and_crop_img(image_file, target_size=model_input_shape, interpolation='nearest:center')
     image_data = np.array(img, dtype=np.float32) / 255.
     image_data = np.expand_dims(image_data, axis=0)
@@ -244,7 +244,7 @@ def validate_classifier_model_pb(model_path, image_file, class_names, loop_count
 
 
     # prepare input image
-    ori_img = Image.open(image_file)
+    ori_img = Image.open(image_file).convert('RGB')
     img = load_and_crop_img(image_file, target_size=model_input_shape, interpolation='nearest:center')
     image_data = np.array(img, dtype=np.float32) / 255.
     image_data = np.expand_dims(image_data, axis=0)
@@ -293,7 +293,7 @@ def validate_classifier_model_tflite(model_path, image_file, class_names, loop_c
         assert num_classes == len(class_names), 'classes number mismatch with model.'
 
     # prepare input image
-    ori_img = Image.open(image_file)
+    ori_img = Image.open(image_file).convert('RGB')
     img = load_and_crop_img(image_file, target_size=model_input_shape, interpolation='nearest:center')
     image_data = np.array(img, dtype=np.float32) / 255.
     image_data = np.expand_dims(image_data, axis=0)
@@ -329,10 +329,10 @@ def handle_prediction(prediction, image, class_names):
     print('Class result\n', result)
 
     cv2.putText(image, result,
-                (10,30),
+                (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 fontScale=1,
-                color=(255,0,0),
+                color=(255, 0, 0),
                 thickness=1,
                 lineType=cv2.LINE_AA)
     Image.fromarray(image).show()

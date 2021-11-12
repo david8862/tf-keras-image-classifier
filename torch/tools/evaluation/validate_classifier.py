@@ -172,10 +172,10 @@ def handle_prediction(prediction, image, class_names):
     print('Class result\n', result)
 
     cv2.putText(image, result,
-                (10,30),
+                (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 fontScale=1,
-                color=(255,0,0),
+                color=(255, 0, 0),
                 thickness=1,
                 lineType=cv2.LINE_AA)
     Image.fromarray(image).show()
