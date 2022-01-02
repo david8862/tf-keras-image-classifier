@@ -6,13 +6,32 @@ Train CNN classifier on images split into directories.
 import numpy as np
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from common import preprocess_crop
-from common.data_utils import normalize_image
+from common.data_utils import normalize_image, random_grayscale, random_chroma, random_contrast, random_sharpness
+
+
+def preprocess(image):
+    # random adjust color level
+    image = random_chroma(image)
+
+    # random adjust contrast
+    image = random_contrast(image)
+
+    # random adjust sharpness
+    image = random_sharpness(image)
+
+    # random convert image to grayscale
+    image = random_grayscale(image)
+
+    # normalize image
+    image = normalize_image(image)
+
+    return image
 
 
 def get_data_generator(data_path, model_input_shape, batch_size, class_names, mode='train'):
     if mode == 'train':
         datagen = ImageDataGenerator(
-            preprocessing_function=normalize_image,
+            preprocessing_function=preprocess,
             #featurewise_center=False,
             #samplewise_center=False,
             #featurewise_std_normalization=False,
@@ -50,7 +69,7 @@ def get_data_generator(data_path, model_input_shape, batch_size, class_names, mo
 
     elif mode == 'val' or mode == 'eval':
         datagen = ImageDataGenerator(
-            preprocessing_function=normalize_image,
+            preprocessing_function=preprocess,
             #rescale=1./255,
             )
 

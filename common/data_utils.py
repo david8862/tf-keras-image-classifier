@@ -3,20 +3,94 @@
 """Data process utility functions."""
 import numpy as np
 import cv2
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 
 
 def rand(a=0, b=1):
     return np.random.rand()*(b-a) + a
 
-def random_gray(x):
-    prob = 0.2
 
+def random_grayscale(image, prob=.2):
+    """
+    Random convert image to grayscale
+
+    # Arguments
+        image: origin image for grayscale convert
+            numpy image array
+        prob: probability for grayscale convert,
+            scalar to control the convert probability.
+
+    # Returns
+        image: adjusted numpy image array.
+    """
     convert = rand() < prob
     if convert:
-        x = cv2.cvtColor(x, cv2.COLOR_RGB2GRAY)
-        x = cv2.cvtColor(x, cv2.COLOR_GRAY2RGB)
-    return x
+        #convert to grayscale first, and then
+        #back to 3 channels fake RGB
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+
+    return image
+
+
+def random_chroma(image, jitter=.5):
+    """
+    Random adjust chroma (color level) for image
+
+    # Arguments
+        image: origin image for grayscale convert
+            numpy image array
+        jitter: jitter range for random chroma,
+            scalar to control the random color level.
+
+    # Returns
+        new_image: adjusted numpy image array.
+    """
+    enh_col = ImageEnhance.Color(Image.fromarray(image.astype(np.uint8)))
+    color = rand(jitter, 1/jitter)
+    new_image = enh_col.enhance(color)
+
+    return np.array(new_image)
+
+
+def random_contrast(image, jitter=.5):
+    """
+    Random adjust contrast for image
+
+    # Arguments
+        image: origin image for contrast change
+            numpy image array
+        jitter: jitter range for random contrast,
+            scalar to control the random contrast level.
+
+    # Returns
+        new_image: adjusted numpy image array.
+    """
+    enh_con = ImageEnhance.Contrast(Image.fromarray(image.astype(np.uint8)))
+    contrast = rand(jitter, 1/jitter)
+    new_image = enh_con.enhance(contrast)
+
+    return np.array(new_image)
+
+
+def random_sharpness(image, jitter=.5):
+    """
+    Random adjust sharpness for image
+
+    # Arguments
+        image: origin image for sharpness change
+            numpy image array
+        jitter: jitter range for random sharpness,
+            scalar to control the random sharpness level.
+
+    # Returns
+        new_image: adjusted numpy image array.
+    """
+    enh_sha = ImageEnhance.Sharpness(Image.fromarray(image.astype(np.uint8)))
+    sharpness = rand(jitter, 1/jitter)
+    new_image = enh_sha.enhance(sharpness)
+
+    return np.array(new_image)
 
 
 def normalize_image(image):
