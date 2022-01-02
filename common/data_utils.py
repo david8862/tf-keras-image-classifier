@@ -2,40 +2,52 @@
 # -*- coding=utf-8 -*-
 """Data process utility functions."""
 import numpy as np
+import cv2
 from PIL import Image
+
+
+def rand(a=0, b=1):
+    return np.random.rand()*(b-a) + a
+
+def random_gray(x):
+    prob = 0.2
+
+    convert = rand() < prob
+    if convert:
+        x = cv2.cvtColor(x, cv2.COLOR_RGB2GRAY)
+        x = cv2.cvtColor(x, cv2.COLOR_GRAY2RGB)
+    return x
 
 
 def normalize_image(image):
     """
     normalize image array from 0 ~ 255
-    to 0.0 ~ 1.0
+    to -1.0 ~ 1.0
 
     # Arguments
         image: origin input image
             numpy image array with dtype=float, 0.0 ~ 255.0
 
     # Returns
-        image: numpy image array with dtype=float, 0.0 ~ 1.0
+        image: numpy image array with dtype=float, -1.0 ~ 1.0
     """
-    image = image / 255.0
+    image = image.astype(np.float32) / 127.5 - 1
 
     return image
 
 
 def denormalize_image(image):
     """
-    Denormalize image tensor from 0.0 ~ 1.0
-    back to 0 ~ 255
+    Denormalize image array from -1.0 ~ 1.0
+    to 0 ~ 255
 
     # Arguments
-        image: normalized image array,
-            distribution 0.0 ~ 1.0
+        image: normalized image array with dtype=float, -1.0 ~ 1.0
 
     # Returns
         image: numpy image array with dtype=uint8, 0 ~ 255
     """
-
-    image = np.uint8(255 * image)
+    image = (image * 127.5 + 127.5).astype(np.uint8)
 
     return image
 
