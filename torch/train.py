@@ -21,7 +21,7 @@ best_acc = 0.0
 
 def checkpoint_clean(checkpoint_dir, max_keep=5):
     # filter out checkpoints and sort
-    checkpoints = sorted(glob.glob(os.path.join(checkpoint_dir, 'ep*.pth')))
+    checkpoints = sorted(glob.glob(os.path.join(checkpoint_dir, 'ep*.pth')), reverse=False)
 
     # keep latest checkpoints
     for checkpoint in checkpoints[:-(max_keep)]:

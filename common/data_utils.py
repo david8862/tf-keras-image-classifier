@@ -126,7 +126,7 @@ def denormalize_image(image):
     return image
 
 
-def preprocess_image(image, model_image_size):
+def preprocess_image(image, model_input_shape):
     """
     Prepare model input image data with
     resize, normalize and dim expansion
@@ -134,13 +134,13 @@ def preprocess_image(image, model_image_size):
     # Arguments
         image: origin input image
             PIL Image object containing image data
-        model_image_size: model input image size
+        model_input_shape: model input image shape
             tuple of format (height, width).
 
     # Returns
         image_data: numpy array of image data for model input.
     """
-    resized_image = image.resize(model_image_size, Image.BICUBIC)
+    resized_image = image.resize(model_input_shape[::-1], Image.BICUBIC)
     image_data = np.asarray(resized_image).astype('float32')
     image_data = normalize_image(image_data)
     image_data = np.expand_dims(image_data, 0)

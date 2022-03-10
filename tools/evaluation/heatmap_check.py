@@ -13,6 +13,12 @@ from tensorflow.keras.models import load_model
 import tensorflow as tf
 import tensorflow.keras.backend as K
 
+# compatible with TF 2.x
+if tf.__version__.startswith('2'):
+    import tensorflow.compat.v1 as tf
+    from tensorflow.compat.v1.keras import backend as K
+    tf.disable_eager_execution()
+
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
 from common.utils import get_classes, get_custom_objects, optimize_tf_gpu
 from common.preprocess_crop import load_and_crop_img
