@@ -184,7 +184,7 @@ def validate_classifier_model_pb(model, image_file, class_names, loop_count, out
     # NOTE: TF 1.x frozen pb graph need to specify input/output tensor name
     # so we hardcode the input/output tensor names here to get them from model
     input_tensor_name = 'graph/image_input:0'
-    output_tensor_name = 'graph/dense/Softmax:0'
+    output_tensor_name = 'graph/score_predict/Softmax:0'
 
     # We can list operations, op.values() gives you a list of tensors it produces
     # op.name gives you the name. These op also include input & output node

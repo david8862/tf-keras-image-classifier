@@ -32,7 +32,7 @@ def predict_keras(model, data, target, class_index):
 def predict_pb(model, data, target, class_index):
     # NOTE: TF 1.x frozen pb graph need to specify input/output tensor name
     # so we need to hardcode the input/output tensor names here to get them from model
-    output_tensor_name = 'graph/dense/Softmax:0'
+    output_tensor_name = 'graph/score_predict/Softmax:0'
 
     # assume only 1 input tensor for image
     input_tensor_name = 'graph/image_input:0'
