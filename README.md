@@ -11,6 +11,7 @@ An end-to-end CNN image classification model training framework. Implement with 
 - [x] MobileViT(S/XS/XXS) ([paper](https://arxiv.org/abs/2110.02178))
 - [x] PeleeNet ([paper](https://arxiv.org/abs/1804.06882))
 - [x] GhostNet ([paper](https://arxiv.org/abs/1911.11907))
+- [x] SqueezeNet ([paper](https://arxiv.org/abs/1602.07360))
 - [x] ResNet50
 
 

@@ -12,6 +12,7 @@ from tensorflow.keras.applications.resnet50 import ResNet50
 from common.backbones.mobilenet_v3 import MobileNetV3Large, MobileNetV3Small
 from common.backbones.peleenet import PeleeNet
 from common.backbones.ghostnet import GhostNet
+from common.backbones.squeezenet import SqueezeNet
 from common.backbones.mobilevit import MobileViT_S, MobileViT_XS, MobileViT_XXS
 from common.backbones.simple_cnn import SimpleCNN, SimpleCNNLite
 
@@ -32,6 +33,8 @@ def get_base_model(model_type, model_input_shape, weights='imagenet'):
         model = PeleeNet(input_tensor=input_tensor, input_shape=model_input_shape+(3,), weights=weights, pooling=None, include_top=False)
     elif model_type == 'ghostnet':
         model = GhostNet(input_tensor=input_tensor, input_shape=model_input_shape+(3,), weights=weights, pooling=None, include_top=False)
+    elif model_type == 'squeezenet':
+        model = SqueezeNet(input_tensor=input_tensor, input_shape=model_input_shape+(3,), weights=weights, pooling=None, include_top=False)
     elif model_type == 'mobilevit_s':
         model = MobileViT_S(input_tensor=input_tensor, input_shape=model_input_shape+(3,), weights=weights, pooling=None, include_top=False)
     elif model_type == 'mobilevit_xs':
