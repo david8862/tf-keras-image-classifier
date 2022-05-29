@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
 # 2020.06.09-Changed for building GhostNet
 #            Huawei Technologies Co., Ltd. <foss@huawei.com>
 """
@@ -291,8 +294,19 @@ if __name__=='__main__':
     summary(model, input_size=(3, 224, 224))
     model.eval()
 
+    input_tensor = torch.randn(1, 3, 224, 224)
+    #import torch.onnx
+    #torch.onnx.export(model, input_tensor, "ghostnet.onnx", verbose=False)
+    from thop import profile, clever_format
+    macs, params = profile(model, inputs=(input_tensor, ))
+    macs, params = clever_format([macs, params], "%.3f")
+    print('Total MACs: {}'.format(macs))
+    print('Total PARAMs: {}'.format(params))
+
+    #torch.save(model, 'check.pth')
+
     # prepare input image
-    image = Image.open('../../../example/dog.jpg').convert('RGB')
+    image = Image.open('../../../example/grace_hopper.jpg').convert('RGB')
     transform=transforms.Compose([
                            transforms.Resize(224),
                            transforms.ToTensor(), # normalize from (0, 255) to (0, 1)

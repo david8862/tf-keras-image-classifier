@@ -28,9 +28,11 @@ def checkpoint_clean(checkpoint_dir, max_keep=5):
         os.remove(checkpoint)
 
 
-def train(args, epoch, model, device, train_loader, optimizer, lr_scheduler, summary_writer):
+def train(args, epoch, model, device, num_classes, train_loader, optimizer, lr_scheduler, summary_writer):
     epoch_loss = 0.0
     epoch_correct = 0.0
+    epoch_topk_correct = 0.0
+
     model.train()
     tbar = tqdm(train_loader)
     for i, (data, target) in enumerate(tbar):
@@ -57,11 +59,23 @@ def train(args, epoch, model, device, train_loader, optimizer, lr_scheduler, sum
         batch_correct = pred.eq(target.view_as(pred)).sum().item()
         epoch_correct += batch_correct
 
-        tbar.set_description('Train loss: %06.4f - acc: %06.4f' % (epoch_loss/(i + 1), epoch_correct/((i + 1)*args.batch_size)))
+        if num_classes > 10:
+            # only collect top 5 accuracy when more than 10 class
+            _, pred = output.topk(5, dim=1, largest=True, sorted=True)
+            target_resize = target.view(-1, 1)
+            batch_topk_correct = pred.eq(target_resize).sum().item()
+            epoch_topk_correct += batch_topk_correct
+            tbar.set_description('Train loss: %06.4f - acc: %06.4f - topk acc: %06.4f' % (epoch_loss/(i + 1), epoch_correct/((i + 1)*args.batch_size), epoch_topk_correct/((i + 1)*args.batch_size)))
+
+        else:
+            tbar.set_description('Train loss: %06.4f - acc: %06.4f' % (epoch_loss/(i + 1), epoch_correct/((i + 1)*args.batch_size)))
 
         # log train loss and accuracy
         summary_writer.add_scalar('train loss', batch_loss, epoch*len(train_loader)+i)
         summary_writer.add_scalar('train accuracy', batch_correct/args.batch_size, epoch*len(train_loader)+i)
+        if num_classes > 10:
+            summary_writer.add_scalar('train topk accuracy', batch_topk_correct/args.batch_size, epoch*len(train_loader)+i)
+
 
     epoch_loss /= len(train_loader)
     # decay learning rate every epoch
@@ -72,10 +86,12 @@ def train(args, epoch, model, device, train_loader, optimizer, lr_scheduler, sum
             lr_scheduler.step()
 
 
-def validate(args, epoch, step, model, device, val_loader, log_dir, summary_writer):
+def validate(args, epoch, step, model, device, num_classes, val_loader, log_dir, summary_writer):
     global best_acc
     val_loss = 0.0
     correct = 0.0
+    topk_correct = 0.0
+
     model.eval()
     with torch.no_grad():
         tbar = tqdm(val_loader)
@@ -90,16 +106,31 @@ def validate(args, epoch, step, model, device, val_loader, log_dir, summary_writ
             val_loss += F.nll_loss(torch.log(output), target, reduction='sum').item() # sum up batch loss
             pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
-            tbar.set_description('Validate loss: %06.4f - acc: %06.4f' % (val_loss/((i + 1)*args.batch_size), correct/((i + 1)*args.batch_size)))
+
+            if num_classes > 10:
+                # only collect top 5 accuracy when more than 10 class
+                _, pred = output.topk(5, dim=1, largest=True, sorted=True)
+                target_resize = target.view(-1, 1)
+                topk_correct = pred.eq(target_resize).sum().item()
+                tbar.set_description('Train loss: %06.4f - acc: %06.4f - topk acc: %06.4f' % (epoch_loss/(i + 1), epoch_correct/((i + 1)*args.batch_size), epoch_topk_correct/((i + 1)*args.batch_size)))
+                tbar.set_description('Validate loss: %06.4f - acc: %06.4f - topk acc: %06.4f' % (val_loss/((i + 1)*args.batch_size), correct/((i + 1)*args.batch_size), topk_correct/((i + 1)*args.batch_size)))
+            else:
+                tbar.set_description('Validate loss: %06.4f - acc: %06.4f' % (val_loss/((i + 1)*args.batch_size), correct/((i + 1)*args.batch_size)))
 
     val_loss /= len(val_loader.dataset)
     val_acc = correct / len(val_loader.dataset)
-    print('Validate set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)'.format(
-        val_loss, correct, len(val_loader.dataset), val_acc))
-
     # log validation loss and accuracy
     summary_writer.add_scalar('val loss', val_loss, step)
     summary_writer.add_scalar('val accuracy', val_acc, step)
+
+    if num_classes > 10:
+        val_topk_acc = topk_correct / len(val_loader.dataset)
+        summary_writer.add_scalar('val topk accuracy', val_topk_acc, step)
+        print('Validate set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%), Topk Accuracy: {}/{} ({:.2f}%)'.format(
+            val_loss, correct, len(val_loader.dataset), val_acc, topk_correct, len(val_loader.dataset), val_topk_acc))
+    else:
+        print('Validate set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)'.format(
+            val_loss, correct, len(val_loader.dataset), val_acc))
 
     # save checkpoint with best accuracy
     if val_acc > best_acc:
@@ -203,8 +234,8 @@ def main():
     # Transfer train loop
     for epoch in range(initial_epoch, epochs):
         print('Epoch %d/%d'%(epoch, epochs))
-        train(args, epoch, model, device, train_loader, optimizer, None, summary_writer)
-        validate(args, epoch, epoch*len(train_loader), model, device, val_loader, log_dir, summary_writer)
+        train(args, epoch, model, device, num_classes, train_loader, optimizer, None, summary_writer)
+        validate(args, epoch, epoch*len(train_loader), model, device, num_classes, val_loader, log_dir, summary_writer)
         checkpoint_clean(log_dir, max_keep=5)
 
 
@@ -225,8 +256,8 @@ def main():
     # Fine tune train loop
     for epoch in range(epochs, args.total_epoch):
         print('Epoch %d/%d'%(epoch, args.total_epoch))
-        train(args, epoch, model, device, train_loader, optimizer, lr_scheduler, summary_writer)
-        validate(args, epoch, epoch*len(train_loader), model, device, val_loader, log_dir, summary_writer)
+        train(args, epoch, model, device, num_classes, train_loader, optimizer, lr_scheduler, summary_writer)
+        validate(args, epoch, epoch*len(train_loader), model, device, num_classes, val_loader, log_dir, summary_writer)
         checkpoint_clean(log_dir, max_keep=5)
 
     # Finally store model

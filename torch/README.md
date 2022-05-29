@@ -53,27 +53,20 @@ An end-to-end CNN image classification model training framework. Implement with 
 
 ```
 # python train.py -h
-usage: train.py [-h] [--model_type MODEL_TYPE]
-                [--model_input_shape MODEL_INPUT_SHAPE]
-                [--head_conv_channel HEAD_CONV_CHANNEL]
-                [--weights_path WEIGHTS_PATH] --train_data_path
-                TRAIN_DATA_PATH --val_data_path VAL_DATA_PATH
-                [--batch_size BATCH_SIZE] [--optimizer {adam,rmsprop,sgd}]
-                [--learning_rate LEARNING_RATE]
-                [--decay_type {None,cosine,plateau,exponential}]
-                [--init_epoch INIT_EPOCH] [--transfer_epoch TRANSFER_EPOCH]
-                [--total_epoch TOTAL_EPOCH] [--no_cuda]
+usage: train.py [-h] [--model_type MODEL_TYPE] [--model_input_shape MODEL_INPUT_SHAPE] [--head_conv_channel HEAD_CONV_CHANNEL]
+                [--weights_path WEIGHTS_PATH] --train_data_path TRAIN_DATA_PATH --val_data_path VAL_DATA_PATH
+                [--batch_size BATCH_SIZE] [--optimizer {adam,rmsprop,sgd}] [--learning_rate LEARNING_RATE]
+                [--decay_type {None,cosine,plateau,exponential,step}] [--weight_decay WEIGHT_DECAY] [--init_epoch INIT_EPOCH]
+                [--transfer_epoch TRANSFER_EPOCH] [--total_epoch TOTAL_EPOCH] [--no_cuda]
 
 train a simple CNN classifier with PyTorch
 
 optional arguments:
   -h, --help            show this help message and exit
   --model_type MODEL_TYPE
-                        backbone model type: mobilenetv3/v2/simple_cnn,
-                        default=mobilenetv2
+                        backbone model type: mobilenetv3/v2/simple_cnn, default=mobilenetv2
   --model_input_shape MODEL_INPUT_SHAPE
-                        model image input shape as <height>x<width>,
-                        default=224x224
+                        model image input shape as <height>x<width>, default=224x224
   --head_conv_channel HEAD_CONV_CHANNEL
                         channel number for head part convolution, default=128
   --weights_path WEIGHTS_PATH
@@ -85,18 +78,17 @@ optional arguments:
   --batch_size BATCH_SIZE
                         batch size for train, default=64
   --optimizer {adam,rmsprop,sgd}
-                        optimizer for training (adam/rmsprop/sgd),
-                        default=adam
+                        optimizer for training (adam/rmsprop/sgd), default=adam
   --learning_rate LEARNING_RATE
                         Initial learning rate, default=0.001
-  --decay_type {None,cosine,plateau,exponential}
+  --decay_type {None,cosine,plateau,exponential,step}
                         Learning rate decay type, default=None
+  --weight_decay WEIGHT_DECAY
+                        Weight decay for optimizer, default=0.0005
   --init_epoch INIT_EPOCH
-                        Initial training epochs for fine tune training,
-                        default=0
+                        Initial training epochs for fine tune training, default=0
   --transfer_epoch TRANSFER_EPOCH
-                        Transfer training (from Imagenet) stage epochs,
-                        default=5
+                        Transfer training (from Imagenet) stage epochs, default=5
   --total_epoch TOTAL_EPOCH
                         Total training epochs, default=100
   --no_cuda             disables CUDA training
@@ -117,8 +109,8 @@ Use [eval.py](https://github.com/david8862/tf-keras-image-classifier/blob/master
 
 ```
 # python eval.py -h
-usage: eval.py [-h] --model_path MODEL_PATH --dataset_path DATASET_PATH
-               [--model_input_shape MODEL_INPUT_SHAPE]
+usage: eval.py [-h] --model_path MODEL_PATH --dataset_path DATASET_PATH [--model_input_shape MODEL_INPUT_SHAPE]
+               [--class_index CLASS_INDEX]
 
 evaluate CNN classifer model (pth/onnx/mnn) with test dataset
 
@@ -131,6 +123,8 @@ optional arguments:
   --model_input_shape MODEL_INPUT_SHAPE
                         model image input size as <height>x<width>,
                         default=224x224
+  --class_index CLASS_INDEX
+                        class index to check the best threshold, default=0
 ```
 
 Reference cmd:
@@ -146,6 +140,8 @@ You can also use [heatmap_check.py](https://github.com/david8862/tf-keras-image-
 usage: heatmap_check.py [-h] --image_path IMAGE_PATH --model_path MODEL_PATH
                         [--model_input_shape MODEL_INPUT_SHAPE] --heatmap_path
                         HEATMAP_PATH [--classes_path CLASSES_PATH]
+
+check heatmap activation for CNN classifer model (pth) with test images
 
 optional arguments:
   -h, --help            show this help message and exit

@@ -223,10 +223,37 @@ def ghostnet(**kwargs):
 
 
 if __name__ == '__main__':
-    model = ghostnet(pretrained=True)
-
+    import os, sys
+    from PIL import Image
+    import torch.nn.functional as F
     from torchsummary import summary
+    from tensorflow.keras.applications.resnet50 import decode_predictions
+
+    sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
+    from common.data_utils import preprocess_image
+
+    model = ghostnet(pretrained=True)
     summary(model, input_size=(3, 224, 224))
+
+    input_tensor = torch.randn(1, 3, 224, 224)
+    #import torch.onnx
+    #torch.onnx.export(model, input_tensor, "ghostnet.onnx", verbose=False)
+    from thop import profile, clever_format
+    macs, params = profile(model, inputs=(input_tensor, ))
+    macs, params = clever_format([macs, params], "%.3f")
+    print('Total MACs: {}'.format(macs))
+    print('Total PARAMs: {}'.format(params))
 
     #torch.save(model, 'check.pth')
 
+    model.eval()
+    with torch.no_grad():
+        # prepare input image
+        image = Image.open('../../../example/grace_hopper.jpg').convert('RGB')
+        image_data = preprocess_image(image, target_size=(224, 224), return_tensor=True)
+        image_data = image_data.unsqueeze(0)
+
+        preds = model(image_data)
+        preds = F.softmax(preds, dim=1).cpu().numpy()
+
+    print('Predicted:', decode_predictions(preds))
