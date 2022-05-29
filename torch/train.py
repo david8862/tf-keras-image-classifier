@@ -112,7 +112,6 @@ def validate(args, epoch, step, model, device, num_classes, val_loader, log_dir,
                 _, pred = output.topk(5, dim=1, largest=True, sorted=True)
                 target_resize = target.view(-1, 1)
                 topk_correct = pred.eq(target_resize).sum().item()
-                tbar.set_description('Train loss: %06.4f - acc: %06.4f - topk acc: %06.4f' % (epoch_loss/(i + 1), epoch_correct/((i + 1)*args.batch_size), epoch_topk_correct/((i + 1)*args.batch_size)))
                 tbar.set_description('Validate loss: %06.4f - acc: %06.4f - topk acc: %06.4f' % (val_loss/((i + 1)*args.batch_size), correct/((i + 1)*args.batch_size), topk_correct/((i + 1)*args.batch_size)))
             else:
                 tbar.set_description('Validate loss: %06.4f - acc: %06.4f' % (val_loss/((i + 1)*args.batch_size), correct/((i + 1)*args.batch_size)))
