@@ -11,19 +11,53 @@ import onnxruntime
 from classifier.data import get_dataloader
 
 
-def predict_torch(model, device, data, target, class_index):
+def topk_np(matrix, K, axis=1):
+    """
+    perform topK based on np.argpartition
+    :param matrix: to be sorted
+    :param K: select and sort the top K items
+    :param axis: 0 or 1. dimension to be sorted.
+    :return:
+    """
+    if axis == 0:
+        row_index = np.arange(matrix.shape[1 - axis])
+        topk_index = np.argpartition(-matrix, K, axis=axis)[0:K, :]
+        topk_data = matrix[topk_index, row_index]
+        topk_index_sort = np.argsort(-topk_data,axis=axis)
+        topk_data_sort = topk_data[topk_index_sort,row_index]
+        topk_index_sort = topk_index[0:K,:][topk_index_sort,row_index]
+    else:
+        column_index = np.arange(matrix.shape[1 - axis])[:, None]
+        topk_index = np.argpartition(-matrix, K, axis=axis)[:, 0:K]
+        topk_data = matrix[column_index, topk_index]
+        topk_index_sort = np.argsort(-topk_data, axis=axis)
+        topk_data_sort = topk_data[column_index, topk_index_sort]
+        topk_index_sort = topk_index[:,0:K][column_index,topk_index_sort]
+
+    return topk_data_sort, topk_index_sort
+
+
+def predict_torch(model, device, num_classes, data, target, class_index):
     model.eval()
     with torch.no_grad():
         data, target = data.to(device), target.to(device)
         output = model(data)
         pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
-
         correct = pred.eq(target.view_as(pred)).sum().item()
+
+        if num_classes > 10:
+            # only collect top 5 accuracy when more than 10 class
+            _, pred = output.topk(5, dim=1, largest=True, sorted=True)
+            target_resize = target.view(-1, 1)
+            topk_correct = pred.eq(target_resize).sum().item()
+        else:
+            topk_correct = 0.0
+
         class_score = output.detach().cpu().numpy()[:, class_index]
-    return correct, class_score
+    return correct, topk_correct, class_score
 
 
-def predict_onnx(model, data, target, class_index):
+def predict_onnx(model, num_classes, data, target, class_index):
     # convert pytorch tensor to numpy array
     data, target = data.detach().cpu().numpy(), target.detach().cpu().numpy()
 
@@ -35,15 +69,22 @@ def predict_onnx(model, data, target, class_index):
 
     feed = {input_tensors[0].name: data}
     output = model.run(None, feed)
-
     pred = np.argmax(output, axis=-1)
-    correct = float(np.equal(pred, target).astype(np.int).sum())
+    correct = float(np.equal(pred, target).astype(np.int32).sum())
+
+    if num_classes > 10:
+        # only collect top 5 accuracy when more than 10 class
+        _, pred = topk_np(output[0], 5, axis=1)
+        target_resize = target.reshape(-1, 1)
+        topk_correct = float(np.equal(pred, target_resize).astype(np.int32).sum())
+    else:
+        topk_correct = 0.0
 
     class_score = output[0][:, class_index]
-    return correct, class_score
+    return correct, topk_correct, class_score
 
 
-def predict_mnn(interpreter, session, data, target, class_index):
+def predict_mnn(interpreter, session, num_classes, data, target, class_index):
     from functools import reduce
     from operator import mul
 
@@ -74,7 +115,7 @@ def predict_mnn(interpreter, session, data, target, class_index):
     input_tensor.copyFrom(tmp_input)
     interpreter.runSession(session)
 
-    pred = []
+    output = []
     # we only handle single output model
     output_tensor = interpreter.getSessionOutput(session)
     output_shape = output_tensor.getShape()
@@ -91,12 +132,20 @@ def predict_mnn(interpreter, session, data, target, class_index):
 
     output_data = np.array(tmp_output.getData(), dtype=float).reshape(output_shape)
 
-    pred.append(output_data)
-    pred = np.argmax(pred[0], axis=-1)
-    correct = float(np.equal(pred, target).astype(np.int).sum())
+    output.append(output_data)
+    pred = np.argmax(output[0], axis=-1)
+    correct = float(np.equal(pred, target).astype(np.int32).sum())
+
+    if num_classes > 10:
+        # only collect top 5 accuracy when more than 10 class
+        _, pred = topk_np(output[0], 5, axis=1)
+        target_resize = target.reshape(-1, 1)
+        topk_correct = float(np.equal(pred, target_resize).astype(np.int32).sum())
+    else:
+        topk_correct = 0.0
 
     class_score = output_data[:, class_index]
-    return correct, class_score
+    return correct, topk_correct, class_score
 
 
 
@@ -125,8 +174,10 @@ def threshold_search(class_scores, class_labels, class_index):
     return (best_accuracy, best_threshold)
 
 
-def evaluate(model, model_format, device, eval_loader, class_index, batch_size):
+def evaluate(model, model_format, device, num_classes, eval_loader, class_index, batch_size):
     correct = 0.0
+    topk_correct = 0.0
+
     class_scores = []
     class_labels = []
 
@@ -138,16 +189,19 @@ def evaluate(model, model_format, device, eval_loader, class_index, batch_size):
     for i, (data, target) in enumerate(tbar):
         # support of PyTorch pth model
         if model_format == 'PTH':
-            tmp_correct, class_score = predict_torch(model, device, data, target, class_index)
+            tmp_correct, tmp_topk_correct, class_score = predict_torch(model, device, num_classes, data, target, class_index)
             correct += tmp_correct
+            topk_correct += tmp_topk_correct
         # support of ONNX model
         elif model_format == 'ONNX':
-            tmp_correct, class_score = predict_onnx(model, data, target, class_index)
+            tmp_correct, tmp_topk_correct, class_score = predict_onnx(model, num_classes, data, target, class_index)
             correct += tmp_correct
+            topk_correct += tmp_topk_correct
         # support of MNN model
         elif model_format == 'MNN':
-            tmp_correct, class_score = predict_mnn(model, session, data, target, class_index)
+            tmp_correct, tmp_topk_correct, class_score = predict_mnn(model, session, num_classes, data, target, class_index)
             correct += tmp_correct
+            topk_correct += tmp_topk_correct
         else:
             raise ValueError('invalid model format')
 
@@ -155,7 +209,10 @@ def evaluate(model, model_format, device, eval_loader, class_index, batch_size):
         class_scores.append(float(class_score))
         class_labels.append(int(target.detach().cpu().numpy()))
 
-        tbar.set_description('Evaluate acc: %06.4f' % (correct/((i + 1)*batch_size)))
+        if num_classes > 10:
+            tbar.set_description('Evaluate acc: %06.4f, topk acc: %06.4f' % (correct/((i + 1)*batch_size), topk_correct/((i + 1)*batch_size)))
+        else:
+            tbar.set_description('Evaluate acc: %06.4f' % (correct/((i + 1)*batch_size)))
 
     val_acc = correct / len(eval_loader.dataset)
     print('Test set accuracy: {}/{} ({:.2f})'.format(
@@ -235,7 +292,7 @@ def main():
     model, model_format = load_eval_model(args.model_path, device)
 
     start = time.time()
-    acc = evaluate(model, model_format, device, eval_loader, args.class_index, batch_size=batch_size)
+    acc = evaluate(model, model_format, device, num_classes, eval_loader, args.class_index, batch_size=batch_size)
     #print("%.5f" % acc)
     end = time.time()
     print("Evaluation time cost: {:.6f}s".format(end - start))
