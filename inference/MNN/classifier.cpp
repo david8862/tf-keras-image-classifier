@@ -432,6 +432,14 @@ void RunInference(Settings* s) {
         MNN_PRINT("%s: %f\n", classes[class_result.first].c_str(), class_result.second);
     }
 
+    // Release buffer memory
+    if (targetImage) {
+        free(targetImage);
+        targetImage = nullptr;
+    }
+
+    delete dataTensor;
+
     // Release session and model
     net->releaseSession(session);
     //net->releaseModel();
