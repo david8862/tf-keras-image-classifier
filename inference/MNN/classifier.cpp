@@ -283,9 +283,6 @@ void RunInference(Settings* s) {
     config.backendConfig = &bnconfig;
 
     auto session = net->createSession(config);
-    // since we don't need to create other sessions any more,
-    // just release model data to save memory
-    net->releaseModel();
 
     // get classes labels and add background label
     std::vector<std::string> classes;
@@ -305,17 +302,20 @@ void RunInference(Settings* s) {
     int input_width = image_input->width();
     int input_height = image_input->height();
     int input_channel = image_input->channel();
-    int input_dim_type = image_input->getDimensionType();
+    auto input_dim_type = image_input->getDimensionType();
 
     std::vector<std::string> dim_type_string = {"TENSORFLOW", "CAFFE", "CAFFE_C4"};
 
     MNN_PRINT("image_input: name:%s, width:%d, height:%d, channel:%d, dim_type:%s\n", inputs.begin()->first.c_str(), input_width, input_height, input_channel, dim_type_string[input_dim_type].c_str());
 
+    auto shape = image_input->shape();
+    shape[0] = 1;
+    net->resizeTensor(image_input, shape);
+    net->resizeSession(session);
 
-    //auto shape = image_input->shape();
-    //shape[0] = 1;
-    //net->resizeTensor(image_input, shape);
-    //net->resizeSession(session);
+    // since we don't need to create other sessions any more,
+    // just release model data to save memory
+    net->releaseModel();
 
     // load input image
     auto inputPath = s->input_img_name.c_str();

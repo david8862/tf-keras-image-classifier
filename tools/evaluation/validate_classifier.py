@@ -102,18 +102,26 @@ def validate_classifier_model_onnx(model, image_file, class_names, loop_count, o
 def validate_classifier_model_mnn(interpreter, session, image_file, class_names, loop_count, output_path):
     # assume only 1 input tensor for image
     input_tensor = interpreter.getSessionInput(session)
-    # get input shape
-    input_shape = input_tensor.getShape()
-    if input_tensor.getDimensionType() == MNN.Tensor_DimensionType_Tensorflow:
-        batch, height, width, channel = input_shape
-    elif input_tensor.getDimensionType() == MNN.Tensor_DimensionType_Caffe:
-        batch, channel, height, width = input_shape
+
+    # get & resize input shape
+    input_shape = list(input_tensor.getShape())
+    if input_shape[0] == 0:
+        input_shape[0] = 1
+        interpreter.resizeTensor(input_tensor, tuple(input_shape))
+        interpreter.resizeSession(session)
+
+    # check if input layout is NHWC or NCHW
+    if input_shape[1] == 3:
+        print("NCHW input layout")
+        batch, channel, height, width = input_shape  #NCHW
+    elif input_shape[-1] == 3:
+        print("NHWC input layout")
+        batch, height, width, channel = input_shape  #NHWC
     else:
         # should be MNN.Tensor_DimensionType_Caffe_C4, unsupported now
         raise ValueError('unsupported input tensor dimension type')
 
     model_input_shape = (height, width)
-
 
     # prepare input image
     ori_img = Image.open(image_file).convert('RGB')
@@ -162,12 +170,6 @@ def validate_classifier_model_mnn(interpreter, session, image_file, class_names,
     output_tensor.copyToHostTensor(tmp_output)
 
     output_data = np.array(tmp_output.getData(), dtype=float).reshape(output_shape)
-    # our postprocess code based on TF NHWC layout, so if the output format
-    # doesn't match, we need to transpose
-    if output_tensor.getDimensionType() == MNN.Tensor_DimensionType_Caffe:
-        output_data = output_data.transpose((0,2,3,1))
-    elif output_tensor.getDimensionType() == MNN.Tensor_DimensionType_Caffe_C4:
-        raise ValueError('unsupported output tensor dimension type')
 
     prediction.append(output_data)
     handle_prediction(prediction[0], image_file, np.array(ori_img), class_names, output_path)

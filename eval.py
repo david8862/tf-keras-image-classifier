@@ -108,12 +108,19 @@ def predict_mnn(interpreter, session, data, target, class_index):
 
     # assume only 1 input tensor for image
     input_tensor = interpreter.getSessionInput(session)
-    # get input shape
-    input_shape = input_tensor.getShape()
-    if input_tensor.getDimensionType() == MNN.Tensor_DimensionType_Tensorflow:
-        batch, height, width, channel = input_shape
-    elif input_tensor.getDimensionType() == MNN.Tensor_DimensionType_Caffe:
-        batch, channel, height, width = input_shape
+
+    # get & resize input shape
+    input_shape = list(input_tensor.getShape())
+    if input_shape[0] == 0:
+        input_shape[0] = 1
+        interpreter.resizeTensor(input_tensor, tuple(input_shape))
+        interpreter.resizeSession(session)
+
+    # check if input layout is NHWC or NCHW
+    if input_shape[1] == 3:
+        batch, channel, height, width = input_shape  #NCHW
+    elif input_shape[-1] == 3:
+        batch, height, width, channel = input_shape  #NHWC
     else:
         # should be MNN.Tensor_DimensionType_Caffe_C4, unsupported now
         raise ValueError('unsupported input tensor dimension type')
