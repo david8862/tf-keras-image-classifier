@@ -6,6 +6,7 @@ import torch.nn.functional as F
 
 from torchvision.models import resnet50
 #from torchvision.models import mobilenet_v2
+from torchvision.models import shufflenet_v2_x0_5, shufflenet_v2_x1_0, shufflenet_v2_x1_5, shufflenet_v2_x2_0
 from common.backbones.mobilenetv2 import mobilenetv2
 from common.backbones.mobilenetv3 import mobilenetv3_large, mobilenetv3_small
 from common.backbones.peleenet import peleenet
@@ -51,6 +52,16 @@ class Classifier(nn.Module):
             features_channel = 704
             features = nn.Sequential(model.stem,
                                      model.stages,
+                                    )
+        elif model_type == 'shufflenetv2':
+            model = shufflenet_v2_x1_0(pretrained=True, progress=True)
+            features_channel = 1024
+            features = nn.Sequential(model.conv1,
+                                     model.maxpool,
+                                     model.stage2,
+                                     model.stage3,
+                                     model.stage4,
+                                     model.conv5,
                                     )
         elif model_type == 'ghostnet':
             model = ghostnet(pretrained=True, weights_path=None)
