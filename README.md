@@ -7,7 +7,7 @@ An end-to-end CNN image classification model training framework. Implement with 
 #### Model Type
 - [x] MobileNet
 - [x] MobileNetV2
-- [x] MobilenetV3(Large/Small)
+- [x] MobileNetV3(Large/Small)
 - [x] MobileViT(S/XS/XXS) ([paper](https://arxiv.org/abs/2110.02178))
 - [x] PeleeNet ([paper](https://arxiv.org/abs/1804.06882))
 - [x] GhostNet ([paper](https://arxiv.org/abs/1911.11907))
@@ -213,6 +213,7 @@ Using [keras_to_onnx.py](https://github.com/david8862/tf-keras-image-classifier/
     --output_file="path/to/save/model.onnx"
     --op_set=11
 ```
+by default, the converted ONNX model follows TF NHWC layout. You can also use `--inputs_as_nchw` to convert input layout to NCHW.
 
 You can also use [eval.py](https://github.com/david8862/tf-keras-image-classifier/blob/master/eval.py) to do evaluation on the pb & onnx inference model
 
