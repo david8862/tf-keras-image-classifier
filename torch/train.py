@@ -190,6 +190,10 @@ def main():
     height, width = args.model_input_shape.split('x')
     args.model_input_shape = (int(height), int(width))
 
+    # HBONet has some input shape limitation
+    if args.model_type == 'hbonet':
+        assert (args.model_input_shape[0]%32 == 0 and args.model_input_shape[1]%32 == 0), 'for hbonet, model_input_shape should be multiples of 32'
+
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     torch.manual_seed(1)

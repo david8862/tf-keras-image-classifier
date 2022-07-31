@@ -10,7 +10,8 @@ An end-to-end CNN image classification model training framework. Implement with 
 - [x] ShuffleNetV2
 - [x] PeleeNet ([paper](https://arxiv.org/abs/1804.06882))
 - [x] CSPPeleeNet ([link](https://github.com/WongKinYiu/CrossStagePartialNetworks))
-- [x] GhostNet ([link](https://arxiv.org/abs/1911.11907))
+- [x] GhostNet ([paper](https://arxiv.org/abs/1911.11907))
+- [x] HBONet ([paper](https://arxiv.org/abs/1908.03888)
 - [x] ResNet50
 
 

@@ -7,7 +7,6 @@ MobileNetV2: Inverted Residuals and Linear Bottlenecks
 arXiv preprint arXiv:1801.04381.
 import from https://github.com/tonylins/pytorch-mobilenet-v2
 """
-
 import torch
 import torch.nn as nn
 import math
@@ -158,6 +157,12 @@ def mobilenetv2(**kwargs):
     else:
         pretrained = None
 
+    if 'weights_path' in kwargs.keys():
+        weights_path = kwargs['weights_path']
+        kwargs.pop('weights_path')
+    else:
+        weights_path = None
+
     if 'width_mult' in kwargs.keys():
         width_mult = kwargs['width_mult']
     else:
@@ -185,6 +190,10 @@ def mobilenetv2(**kwargs):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         pretrain_dict = model_zoo.load_url(weights_url, map_location=device)
         model.load_state_dict(pretrain_dict)
+
+    if weights_path:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model.load_state_dict(torch.load(weights_path, map_location=device))
 
     return model
 

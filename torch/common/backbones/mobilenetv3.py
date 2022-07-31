@@ -6,7 +6,6 @@ Andrew Howard, Mark Sandler, Grace Chu, Liang-Chieh Chen, Bo Chen, Mingxing Tan,
 Searching for MobileNetV3
 arXiv preprint arXiv:1905.02244.
 """
-
 import torch
 import torch.nn as nn
 import math
@@ -247,6 +246,12 @@ def mobilenetv3_small(**kwargs):
     else:
         pretrained = None
 
+    if 'weights_path' in kwargs.keys():
+        weights_path = kwargs['weights_path']
+        kwargs.pop('weights_path')
+    else:
+        weights_path = None
+
     if 'width_mult' in kwargs.keys():
         width_mult = kwargs['width_mult']
     else:
@@ -281,6 +286,10 @@ def mobilenetv3_small(**kwargs):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         pretrain_dict = model_zoo.load_url(weights_url, map_location=device)
         model.load_state_dict(pretrain_dict)
+
+    if weights_path:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model.load_state_dict(torch.load(weights_path, map_location=device))
 
     return model
 

@@ -12,6 +12,7 @@ from common.backbones.mobilenetv3 import mobilenetv3_large, mobilenetv3_small
 from common.backbones.peleenet import peleenet
 from common.backbones.csppeleenet import csppeleenet
 from common.backbones.ghostnet import ghostnet
+from common.backbones.hbonet import hbonet
 from common.backbones.mobilevit import mobilevit_s, mobilevit_xs, mobilevit_xxs
 
 
@@ -66,6 +67,11 @@ class Classifier(nn.Module):
         elif model_type == 'ghostnet':
             model = ghostnet(pretrained=True, weights_path=None)
             features_channel = 160
+            features = model.features
+        elif model_type == 'hbonet':
+            width_mult=0.5
+            model = hbonet(pretrained=True, width_mult=width_mult)
+            features_channel = int(400*width_mult)
             features = model.features
         elif model_type == 'mobilevit_s':
             model = mobilevit_s(pretrained=False)
