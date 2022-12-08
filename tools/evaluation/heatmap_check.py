@@ -52,7 +52,7 @@ def get_target_size(model):
 def generate_heatmap(image_path, model_path, heatmap_path, class_names=None):
     # load model
     custom_object_dict = get_custom_objects()
-    model = load_model(model_path, custom_objects=custom_object_dict)
+    model = load_model(model_path, compile=False, custom_objects=custom_object_dict)
     K.set_learning_phase(0)
     model.summary()
 
