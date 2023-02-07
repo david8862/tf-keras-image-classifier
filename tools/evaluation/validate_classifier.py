@@ -16,8 +16,11 @@ from tensorflow.lite.python import interpreter as interpreter_wrapper
 import tensorflow as tf
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
-from common.utils import get_classes, get_custom_objects
+from common.utils import get_classes, get_custom_objects, optimize_tf_gpu
 from common.preprocess_crop import load_and_crop_img
+
+
+optimize_tf_gpu(tf, K)
 
 
 def validate_classifier_model(model, image_file, class_names, model_input_shape, loop_count, output_path):

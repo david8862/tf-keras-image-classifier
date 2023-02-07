@@ -3,6 +3,9 @@
 import os, argparse, time
 import numpy as np
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+import itertools
+from sklearn.metrics import confusion_matrix
 
 from tensorflow.keras.models import load_model
 import tensorflow.keras.backend as K
@@ -19,17 +22,15 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 optimize_tf_gpu(tf, K)
 
 
-def predict_keras(model, data, target, class_index):
+def predict_keras(model, data, class_index):
     output = model.predict(data)
     pred = np.argmax(output, axis=-1)
-    target = np.argmax(target, axis=-1)
-    correct = float(np.equal(pred, target).astype(np.int).sum())
 
     class_score = output[:, class_index]
-    return correct, class_score
+    return pred, class_score
 
 
-def predict_pb(model, data, target, class_index):
+def predict_pb(model, data, class_index):
     # NOTE: TF 1.x frozen pb graph need to specify input/output tensor name
     # so we need to hardcode the input/output tensor names here to get them from model
     output_tensor_name = 'graph/score_predict/Softmax:0'
@@ -46,14 +47,12 @@ def predict_pb(model, data, target, class_index):
             image_input: data
         })
     pred = np.argmax(output, axis=-1)
-    target = np.argmax(target, axis=-1)
-    correct = float(np.equal(pred, target).astype(np.int).sum())
 
     class_score = output[:, class_index]
-    return correct, class_score
+    return pred, class_score
 
 
-def predict_tflite(interpreter, data, target, class_index):
+def predict_tflite(interpreter, data, class_index):
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
 
@@ -66,14 +65,12 @@ def predict_tflite(interpreter, data, target, class_index):
         output.append(output_data)
 
     pred = np.argmax(output[0], axis=-1)
-    target = np.argmax(target, axis=-1)
-    correct = float(np.equal(pred, target).astype(np.int).sum())
 
     class_score = output[0][:, class_index]
-    return correct, class_score
+    return pred, class_score
 
 
-def predict_onnx(model, data, target, class_index):
+def predict_onnx(model, data, class_index):
 
     input_tensors = []
     for i, input_tensor in enumerate(model.get_inputs()):
@@ -95,14 +92,11 @@ def predict_onnx(model, data, target, class_index):
     output = model.run(None, feed)
 
     pred = np.argmax(output, axis=-1)
-    target = np.argmax(target, axis=-1)
-    correct = float(np.equal(pred, target).astype(np.int).sum())
-
     class_score = output[0][:, class_index]
-    return correct, class_score
+    return pred, class_score
 
 
-def predict_mnn(interpreter, session, data, target, class_index):
+def predict_mnn(interpreter, session, data, class_index):
     from functools import reduce
     from operator import mul
 
@@ -156,11 +150,38 @@ def predict_mnn(interpreter, session, data, target, class_index):
 
     output.append(output_data)
     pred = np.argmax(output[0], axis=-1)
-    target = np.argmax(target, axis=-1)
-    correct = float(np.equal(pred, target).astype(np.int).sum())
 
     class_score = output[0][:, class_index]
-    return correct, class_score
+    return pred, class_score
+
+
+def plot_confusion_matrix(cm, classes, accuracy, normalize=False, title='Confusion matrix', cmap=plt.cm.Blues):
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        cm[np.isnan(cm)] = 0
+    trained_classes = classes
+    plt.figure()
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title, fontsize=11)
+    tick_marks = np.arange(len(classes))
+    plt.xticks(np.arange(len(trained_classes)), classes, rotation=90, fontsize=9)
+    plt.yticks(tick_marks, classes, fontsize=9)
+    thresh = cm.max() / 2.
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j, i, np.round(cm[i, j], 2), horizontalalignment="center", color="white" if cm[i, j] > thresh else "black", fontsize=7)
+    plt.ylabel('True label', fontsize=9)
+    plt.xlabel('Predicted label', fontsize=9)
+
+    plt.title('Accuracy: ' + str(np.round(accuracy*100, 2)))
+    output_path = os.path.join('result', 'confusion_matrix.png')
+    os.makedirs('result', exist_ok=True)
+    plt.tight_layout()
+    plt.savefig(output_path)
+    #plt.show()
+
+    # close the plot
+    plt.close()
+    return
 
 
 def threshold_search(class_scores, class_labels, class_index):
@@ -188,8 +209,10 @@ def threshold_search(class_scores, class_labels, class_index):
     return (best_accuracy, best_threshold)
 
 
-def evaluate_accuracy(model, model_format, eval_generator, class_index):
+def evaluate_accuracy(model, model_format, eval_generator, class_names, class_index):
     correct = 0.0
+    target_list = []
+    pred_list = []
     class_scores = []
     class_labels = []
 
@@ -203,30 +226,32 @@ def evaluate_accuracy(model, model_format, eval_generator, class_index):
         data, target = eval_generator.next()
         # normal keras h5 model
         if model_format == 'H5':
-            tmp_correct, class_score = predict_keras(model, data, target, class_index)
-            correct += tmp_correct
+            pred, class_score = predict_keras(model, data, class_index)
         # support of TF 1.x frozen pb model
         elif model_format == 'PB':
-            tmp_correct, class_score = predict_pb(model, data, target, class_index)
-            correct += tmp_correct
+            pred, class_score = predict_pb(model, data, class_index)
         # support of tflite model
         elif model_format == 'TFLITE':
-            tmp_correct, class_score = predict_tflite(model, data, target, class_index)
-            correct += tmp_correct
+            pred, class_score = predict_tflite(model, data, class_index)
         # support of ONNX model
         elif model_format == 'ONNX':
-            tmp_correct, class_score = predict_onnx(model, data, target, class_index)
-            correct += tmp_correct
+            pred, class_score = predict_onnx(model, data, class_index)
         # support of MNN model
         elif model_format == 'MNN':
-            tmp_correct, class_score = predict_mnn(model, session, data, target, class_index)
-            correct += tmp_correct
+            pred, class_score = predict_mnn(model, session, data, class_index)
         else:
             raise ValueError('invalid model format')
 
+        target = np.argmax(target, axis=-1)
+        correct += float(np.equal(pred, target).astype(np.int32).sum())
+
+        # record pred & target for confusion matrix
+        target_list.append(target)
+        pred_list.append(pred)
+
         # record score & labels for specified class
         class_scores.append(float(class_score))
-        class_labels.append(int(np.argmax(target, axis=-1)))
+        class_labels.append(int(target))
 
         pbar.set_description('Evaluate acc: %06.4f' % (correct/((i + 1)*(eval_generator.batch_size))))
         pbar.update(1)
@@ -234,7 +259,11 @@ def evaluate_accuracy(model, model_format, eval_generator, class_index):
 
     val_acc = correct / eval_generator.samples
     print('Test set accuracy: {}/{} ({:.2f}%)'.format(
-        correct, eval_generator.samples, val_acc))
+        correct, eval_generator.samples, val_acc*100))
+
+    # Plot accuracy & confusion matrix
+    confusion_mat = confusion_matrix(y_true=np.squeeze(target_list), y_pred=np.squeeze(pred_list), labels=list(range(len(class_names))))
+    plot_confusion_matrix(confusion_mat, class_names, val_acc, normalize=True)
 
     # search for a best score threshold on one class
     accuracy, threshold = threshold_search(class_scores, class_labels, class_index)
@@ -343,7 +372,7 @@ def main():
     eval_generator = get_data_generator(args.dataset_path, args.model_input_shape, batch_size, class_names, mode='eval')
 
     start = time.time()
-    evaluate_accuracy(model, model_format, eval_generator, args.class_index)
+    evaluate_accuracy(model, model_format, eval_generator, class_names, args.class_index)
     end = time.time()
     print("Evaluation time cost: {:.6f}s".format(end - start))
 

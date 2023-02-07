@@ -3,6 +3,9 @@
 import os, sys, argparse, time
 import numpy as np
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+import itertools
+from sklearn.metrics import confusion_matrix
 
 import torch
 import MNN
@@ -43,18 +46,17 @@ def predict_torch(model, device, num_classes, data, target, class_index):
         data, target = data.to(device), target.to(device)
         output = model(data)
         pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
-        correct = pred.eq(target.view_as(pred)).sum().item()
 
         if num_classes > 10:
             # only collect top 5 accuracy when more than 10 class
-            _, pred = output.topk(5, dim=1, largest=True, sorted=True)
+            _, tmp_pred = output.topk(5, dim=1, largest=True, sorted=True)
             target_resize = target.view(-1, 1)
-            topk_correct = pred.eq(target_resize).sum().item()
+            topk_correct = tmp_pred.eq(target_resize).sum().item()
         else:
             topk_correct = 0.0
 
         class_score = output.detach().cpu().numpy()[:, class_index]
-    return correct, topk_correct, class_score
+    return pred.detach().cpu().numpy(), topk_correct, class_score
 
 
 def predict_onnx(model, num_classes, data, target, class_index):
@@ -70,18 +72,17 @@ def predict_onnx(model, num_classes, data, target, class_index):
     feed = {input_tensors[0].name: data}
     output = model.run(None, feed)
     pred = np.argmax(output, axis=-1)
-    correct = float(np.equal(pred, target).astype(np.int32).sum())
 
     if num_classes > 10:
         # only collect top 5 accuracy when more than 10 class
-        _, pred = topk_np(output[0], 5, axis=1)
+        _, tmp_pred = topk_np(output[0], 5, axis=1)
         target_resize = target.reshape(-1, 1)
-        topk_correct = float(np.equal(pred, target_resize).astype(np.int32).sum())
+        topk_correct = float(np.equal(tmp_pred, target_resize).astype(np.int32).sum())
     else:
         topk_correct = 0.0
 
     class_score = output[0][:, class_index]
-    return correct, topk_correct, class_score
+    return pred, topk_correct, class_score
 
 
 def predict_mnn(interpreter, session, num_classes, data, target, class_index):
@@ -134,19 +135,46 @@ def predict_mnn(interpreter, session, num_classes, data, target, class_index):
 
     output.append(output_data)
     pred = np.argmax(output[0], axis=-1)
-    correct = float(np.equal(pred, target).astype(np.int32).sum())
 
     if num_classes > 10:
         # only collect top 5 accuracy when more than 10 class
-        _, pred = topk_np(output[0], 5, axis=1)
+        _, tmp_pred = topk_np(output[0], 5, axis=1)
         target_resize = target.reshape(-1, 1)
-        topk_correct = float(np.equal(pred, target_resize).astype(np.int32).sum())
+        topk_correct = float(np.equal(tmp_pred, target_resize).astype(np.int32).sum())
     else:
         topk_correct = 0.0
 
     class_score = output_data[:, class_index]
-    return correct, topk_correct, class_score
+    return pred, topk_correct, class_score
 
+
+def plot_confusion_matrix(cm, classes, accuracy, normalize=False, title='Confusion matrix', cmap=plt.cm.Blues):
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        cm[np.isnan(cm)] = 0
+    trained_classes = classes
+    plt.figure()
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title, fontsize=11)
+    tick_marks = np.arange(len(classes))
+    plt.xticks(np.arange(len(trained_classes)), classes, rotation=90, fontsize=9)
+    plt.yticks(tick_marks, classes, fontsize=9)
+    thresh = cm.max() / 2.
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j, i, np.round(cm[i, j], 2), horizontalalignment="center", color="white" if cm[i, j] > thresh else "black", fontsize=7)
+    plt.ylabel('True label', fontsize=9)
+    plt.xlabel('Predicted label', fontsize=9)
+
+    plt.title('Accuracy: ' + str(np.round(accuracy*100, 2)))
+    output_path = os.path.join('result', 'confusion_matrix.png')
+    os.makedirs('result', exist_ok=True)
+    plt.tight_layout()
+    plt.savefig(output_path)
+    #plt.show()
+
+    # close the plot
+    plt.close()
+    return
 
 
 def threshold_search(class_scores, class_labels, class_index):
@@ -174,10 +202,13 @@ def threshold_search(class_scores, class_labels, class_index):
     return (best_accuracy, best_threshold)
 
 
-def evaluate(model, model_format, device, num_classes, eval_loader, class_index, batch_size):
+def evaluate(model, model_format, device, class_names, eval_loader, class_index, batch_size):
     correct = 0.0
     topk_correct = 0.0
+    num_classes = len(class_names)
 
+    target_list = []
+    pred_list = []
     class_scores = []
     class_labels = []
 
@@ -189,25 +220,29 @@ def evaluate(model, model_format, device, num_classes, eval_loader, class_index,
     for i, (data, target) in enumerate(tbar):
         # support of PyTorch pth model
         if model_format == 'PTH':
-            tmp_correct, tmp_topk_correct, class_score = predict_torch(model, device, num_classes, data, target, class_index)
-            correct += tmp_correct
+            pred, tmp_topk_correct, class_score = predict_torch(model, device, num_classes, data, target, class_index)
             topk_correct += tmp_topk_correct
         # support of ONNX model
         elif model_format == 'ONNX':
-            tmp_correct, tmp_topk_correct, class_score = predict_onnx(model, num_classes, data, target, class_index)
-            correct += tmp_correct
+            pred, tmp_topk_correct, class_score = predict_onnx(model, num_classes, data, target, class_index)
             topk_correct += tmp_topk_correct
         # support of MNN model
         elif model_format == 'MNN':
-            tmp_correct, tmp_topk_correct, class_score = predict_mnn(model, session, num_classes, data, target, class_index)
-            correct += tmp_correct
+            pred, tmp_topk_correct, class_score = predict_mnn(model, session, num_classes, data, target, class_index)
             topk_correct += tmp_topk_correct
         else:
             raise ValueError('invalid model format')
 
+        target = target.detach().cpu().numpy()
+        correct += float(np.equal(pred, target).astype(np.int32).sum())
+
+        # record pred & target for confusion matrix
+        target_list.append(target)
+        pred_list.append(pred)
+
         # record score & labels for specified class
         class_scores.append(float(class_score))
-        class_labels.append(int(target.detach().cpu().numpy()))
+        class_labels.append(int(target))
 
         if num_classes > 10:
             tbar.set_description('Evaluate acc: %06.4f, topk acc: %06.4f' % (correct/((i + 1)*batch_size), topk_correct/((i + 1)*batch_size)))
@@ -218,12 +253,15 @@ def evaluate(model, model_format, device, num_classes, eval_loader, class_index,
     print('Test set accuracy: {}/{} ({:.2f})'.format(
         correct, len(eval_loader.dataset), val_acc))
 
+    # Plot accuracy & confusion matrix
+    confusion_mat = confusion_matrix(y_true=np.squeeze(target_list), y_pred=np.squeeze(pred_list), labels=list(range(len(class_names))))
+    plot_confusion_matrix(confusion_mat, class_names, val_acc, normalize=True)
+
     # search for a best score threshold on one class
     accuracy, threshold = threshold_search(class_scores, class_labels, class_index)
     print('Best accuracy for class[{}]({}): {:.4f}, with score threshold {:.4f}'.format(class_index, eval_loader.dataset.classes[class_index], accuracy, threshold))
 
     return val_acc
-
 
 
 def load_eval_model(model_path, device):
@@ -285,14 +323,14 @@ def main():
     batch_size = 1
     eval_loader = get_dataloader(args.dataset_path, args.model_input_shape, batch_size=batch_size, use_cuda=use_cuda, mode='eval')
 
-    num_classes = len(eval_loader.dataset.classes)
-    print('Classes:', eval_loader.dataset.classes)
+    class_names = eval_loader.dataset.classes
+    print('Classes:', class_names)
 
     # get eval model
     model, model_format = load_eval_model(args.model_path, device)
 
     start = time.time()
-    acc = evaluate(model, model_format, device, num_classes, eval_loader, args.class_index, batch_size=batch_size)
+    acc = evaluate(model, model_format, device, class_names, eval_loader, args.class_index, batch_size=batch_size)
     #print("%.5f" % acc)
     end = time.time()
     print("Evaluation time cost: {:.6f}s".format(end - start))
