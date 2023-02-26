@@ -155,7 +155,6 @@ def plot_confusion_matrix(cm, classes, accuracy, normalize=False, title='Confusi
     trained_classes = classes
     plt.figure()
     plt.imshow(cm, interpolation='nearest', cmap=cmap)
-    plt.title(title, fontsize=11)
     tick_marks = np.arange(len(classes))
     plt.xticks(np.arange(len(trained_classes)), classes, rotation=90, fontsize=9)
     plt.yticks(tick_marks, classes, fontsize=9)
@@ -165,7 +164,7 @@ def plot_confusion_matrix(cm, classes, accuracy, normalize=False, title='Confusi
     plt.ylabel('True label', fontsize=9)
     plt.xlabel('Predicted label', fontsize=9)
 
-    plt.title('Accuracy: ' + str(np.round(accuracy*100, 2)))
+    plt.title(title + '\nAccuracy: ' + str(np.round(accuracy*100, 2)))
     output_path = os.path.join('result', 'confusion_matrix.png')
     os.makedirs('result', exist_ok=True)
     plt.tight_layout()
