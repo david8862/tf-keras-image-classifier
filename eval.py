@@ -217,7 +217,13 @@ def evaluate_accuracy(model, model_format, eval_generator, class_names, class_in
 
     if model_format == 'MNN':
         #MNN inference engine need create session
-        session = model.createSession()
+        session_config = \
+        {
+          'backend': 'CPU',  #'CPU'/'OPENCL'/'OPENGL'/'VULKAN'/'METAL'/'TRT'/'CUDA'/'HIAI'
+          'precision': 'high',  #'normal'/'low'/'high'/'lowBF'
+          'numThread': 2
+        }
+        session = model.createSession(session_config)
 
     step = eval_generator.samples // eval_generator.batch_size
     pbar = tqdm(total=step)

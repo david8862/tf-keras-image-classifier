@@ -213,7 +213,13 @@ def evaluate(model, model_format, device, class_names, eval_loader, class_index,
 
     if model_format == 'MNN':
         #MNN inference engine need create session
-        session = model.createSession()
+        session_config = \
+        {
+          'backend': 'CPU',  #'CPU'/'OPENCL'/'OPENGL'/'VULKAN'/'METAL'/'TRT'/'CUDA'/'HIAI'
+          'precision': 'high',  #'normal'/'low'/'high'/'lowBF'
+          'numThread': 2
+        }
+        session = model.createSession(session_config)
 
     tbar = tqdm(eval_loader)
     for i, (data, target) in enumerate(tbar):
