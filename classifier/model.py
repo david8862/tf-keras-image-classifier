@@ -19,7 +19,7 @@ from common.backbones.simple_cnn import SimpleCNN, SimpleCNNLite
 
 def get_base_model(model_type, model_input_shape, weights='imagenet'):
 
-    input_tensor = Input(shape=model_input_shape+(3,), name='image_input')
+    input_tensor = Input(shape=model_input_shape+(3,), batch_size=None, name='image_input')
 
     if model_type == 'mobilenet':
         model = MobileNet(input_tensor=input_tensor, input_shape=model_input_shape+(3,), weights=weights, pooling=None, include_top=False, alpha=0.5)

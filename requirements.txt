@@ -3,7 +3,7 @@ scipy
 scikit-learn
 opencv-python
 opencv-contrib-python
-tensorflow-gpu
+tensorflow
 keras_applications
 matplotlib
 tqdm
