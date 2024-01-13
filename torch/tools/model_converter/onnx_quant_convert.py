@@ -28,7 +28,7 @@ class DataReader(CalibrationDataReader):
     def get_next(self):
         if self.preprocess_flag:
             self.preprocess_flag = False
-            model = onnxruntime.InferenceSession(self.model_file, None)
+            model = onnxruntime.InferenceSession(model_path, providers=['CUDAExecutionProvider', 'TensorrtExecutionProvider', 'CPUExecutionProvider'], provider_options=None)
 
             input_tensors = []
             for i, input_tensor in enumerate(model.get_inputs()):

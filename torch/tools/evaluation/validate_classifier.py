@@ -184,7 +184,7 @@ def load_val_model(model_path, device):
 
     # support of ONNX model
     elif model_path.endswith('.onnx'):
-        model = onnxruntime.InferenceSession(model_path)
+        model = onnxruntime.InferenceSession(model_path, providers=['CUDAExecutionProvider', 'TensorrtExecutionProvider', 'CPUExecutionProvider'], provider_options=None)
 
     # support of MNN model
     elif model_path.endswith('.mnn'):
