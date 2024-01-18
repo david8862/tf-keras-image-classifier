@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+# Reference doc:
+# https://blog.csdn.net/sgyuanshi/article/details/123536579
+# https://cloud.tencent.com/developer/article/2346623
+# https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/getting_started/quickstart.html
+# https://zhuanlan.zhihu.com/p/574146311
+# https://zhuanlan.zhihu.com/p/361934132
+
+# install CUDA/CuDNN/TensorRT
+
+# clone triton inference server repo
+git clone -b r23.12 https://github.com/triton-inference-server/server.git
+
+# download demon models
+pushd server/docs/examples
+./fetch_models.sh
+popd
+
+
+# install nvidia-docker
+distribution=$(. /etc/os-release;echo $ID$VERSION_ID) && curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add - && curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+apt install nvidia-docker2
+systemctl restart docker
+
+# get & run triton server docker image
+docker pull nvcr.io/nvidia/tritonserver:23.12-py3
+docker run --gpus=1 --rm -p8000:8000 -p8001:8001 -p8002:8002 -v`pwd`/server/docs/examples/model_repository:/models nvcr.io/nvidia/tritonserver:23.12-py3 tritonserver --model-repository=/models --grpc-use-ssl=false
+
