@@ -1,38 +1,294 @@
-// Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions
-// are met:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of NVIDIA CORPORATION nor the names of its
-//    contributors may be used to endorse or promote products derived
-//    from this software without specific prior written permission.
+//  classifier_http_client.cpp
+//  Triton HTTP client
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
-// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
-// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-#include <getopt.h>
-#include <unistd.h>
-
+//  Created by david8862 on 2024/01/28.
+//
+#include <stdio.h>
+#include <stdlib.h>
+#include <limits.h>
+#include <assert.h>
+#include <algorithm>
+#include <fstream>
+#include <functional>
+#include <memory>
+#include <sstream>
 #include <iostream>
-#include <string>
+#include <vector>
+#include <numeric>
+#include <math.h>
+#include <unistd.h>
+#include <getopt.h>
+#include <string.h>
+#include <sys/time.h>
 
 #include "http_client.h"
+#include "json_utils.h"
+#include <rapidjson/error/en.h>
+
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
+#include "stb_image_resize.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 namespace tc = triton::client;
+
+
+// model inference settings
+struct Settings {
+    int loop_count = 1;
+    int number_of_warmup_runs = 2;
+    int top_k = 1;
+    float input_mean = 127.5f;
+    float input_std = 127.5f;
+    std::string server_addr = "localhost";
+    std::string server_port = "8001";
+    std::string model_name = "classifier_onnx";
+    std::string input_img_name = "./dog.jpg";
+    std::string classes_file_name = "./classes.txt";
+    bool verbose = false;
+};
+
+
+double get_us(struct timeval t)
+{
+    return (t.tv_sec * 1000000 + t.tv_usec);
+}
+
+
+tc::Error
+ParseJson(rapidjson::Document* document, const std::string& json_str)
+{
+  const unsigned int parseFlags = rapidjson::kParseNanAndInfFlag;
+  document->Parse<parseFlags>(json_str.c_str(), json_str.size());
+  if (document->HasParseError()) {
+    return tc::Error(
+        "failed to parse JSON at" + std::to_string(document->GetErrorOffset()) +
+        ": " + std::string(GetParseError_En(document->GetParseError())));
+  }
+
+  return tc::Error::Success;
+}
+
+
+void RunInference(Settings* s)
+{
+    // record run time for every stage
+    struct timeval start_time, stop_time;
+    std::string server_url = s->server_addr + ":" + s->server_port;
+    std::string model_version = "";
+
+    // get classes labels
+    std::vector<std::string> classes;
+    std::ifstream classesOs(s->classes_file_name.c_str());
+    std::string line;
+    while (std::getline(classesOs, line)) {
+        classes.emplace_back(line);
+    }
+    int num_classes = classes.size();
+    std::cout << "num_classes: " << num_classes << "\n";
+
+    // create InferenceServerHttpClient instance to communicate
+    // with triton server using HTTP protocol
+    std::unique_ptr<tc::InferenceServerHttpClient> client;
+    tc::Error err;
+
+    err = tc::InferenceServerHttpClient::Create(&client, server_url, s->verbose);
+    if (!err.IsOk()) {
+        std::cerr << "unable to create http client: " << err << std::endl;
+        exit(1);
+    };
+
+    // confirm server & model is available
+    bool live;
+    err = client->IsServerLive(&live);
+    if (!err.IsOk()) {
+        std::cerr << "error: unable to get server liveness: " << err << std::endl;
+        exit(1);
+    }
+    if (!live) {
+        std::cerr << "error: server is not live" << std::endl;
+        exit(1);
+    }
+
+    bool ready;
+    err = client->IsServerReady(&ready);
+    if (!err.IsOk()) {
+        std::cerr << "error: unable to get server readiness: " << err << std::endl;
+        exit(1);
+    }
+    if (!ready) {
+        std::cerr << "error: server is not ready" << std::endl;
+        exit(1);
+    }
+
+    bool model_ready;
+    err = client->IsModelReady(&model_ready, s->model_name);
+    if (!err.IsOk()) {
+        std::cerr << "error: unable to get model readiness: " << err << std::endl;
+        exit(1);
+    }
+    if (!model_ready) {
+        std::cerr << "error: model " << s->model_name << " is not ready" << std::endl;
+        exit(1);
+    }
+
+    // get model metadata
+    std::string model_metadata;
+    err = client->ModelMetadata(&model_metadata, s->model_name, model_version);
+    if (!err.IsOk()) {
+        std::cerr << "error: unable to get model metadata: " << err << std::endl;
+        exit(1);
+    }
+    rapidjson::Document model_metadata_json;
+    //err = tc::ParseJson(&model_metadata_json, model_metadata);
+    err = ParseJson(&model_metadata_json, model_metadata);
+    if (!err.IsOk()) {
+        std::cerr << "error: failed to parse model metadata: " << err << std::endl;
+        exit(1);
+    }
+
+#if 0
+    if ((std::string(model_metadata_json["name"].GetString()))
+            .compare(s->model_name) != 0) {
+      std::cerr << "error: unexpected model metadata: " << model_metadata
+                << std::endl;
+      exit(1);
+    }
+#endif
+
+
+    if (s->verbose) {
+        // show some statistic info
+        //std::cout << "======Inference Statistics======" << std::endl;
+        //std::cout << results_ptr->DebugString() << std::endl;
+
+        tc::InferStat infer_stat;
+        client->ClientInferStat(&infer_stat);
+        std::cout << "======Client Statistics======" << std::endl;
+        std::cout << "completed_request_count " << infer_stat.completed_request_count
+            << std::endl;
+        std::cout << "cumulative_total_request_time_ns "
+            << infer_stat.cumulative_total_request_time_ns << std::endl;
+        std::cout << "cumulative_send_time_ns " << infer_stat.cumulative_send_time_ns
+            << std::endl;
+        std::cout << "cumulative_receive_time_ns "
+            << infer_stat.cumulative_receive_time_ns << std::endl;
+
+        std::string model_stat;
+        client->ModelInferenceStatistics(&model_stat, s->model_name);
+        std::cout << "======Model Statistics======" << std::endl;
+        std::cout << model_stat << std::endl;
+    }
+
+    return;
+}
+
+
+void display_usage() {
+    std::cout
+        << "Usage: classifier_http_client\n"
+        << "--server_addr, -a: localhost\n"
+        << "--server_port, -p: 8000\n"
+        << "--model_name, -m: classifier_onnx\n"
+        << "--image, -i: image_name.jpg\n"
+        << "--classes, -l: classes labels for the model\n"
+        << "--top_k, -k: show top k classes result\n"
+        << "--input_mean, -b: input mean\n"
+        << "--input_std, -s: input standard deviation\n"
+        << "--count, -c: loop model run for certain times\n"
+        << "--warmup_runs, -w: number of warmup runs\n"
+        << "--verbose, -v: [0|1] print more information\n"
+        << "\n";
+    return;
+}
+
+
+int main(int argc, char** argv) {
+  Settings s;
+
+  int c;
+  while (1) {
+    static struct option long_options[] = {
+        {"server_addr", required_argument, nullptr, 'a'},
+        {"server_port", required_argument, nullptr, 'p'},
+        {"model_name", required_argument, nullptr, 'm'},
+        {"image", required_argument, nullptr, 'i'},
+        {"classes", required_argument, nullptr, 'l'},
+        {"top_k", required_argument, nullptr, 'k'},
+        {"input_mean", required_argument, nullptr, 'b'},
+        {"input_std", required_argument, nullptr, 's'},
+        {"count", required_argument, nullptr, 'c'},
+        {"warmup_runs", required_argument, nullptr, 'w'},
+        {"verbose", required_argument, nullptr, 'v'},
+        {"help", no_argument, nullptr, 'h'},
+        {nullptr, 0, nullptr, 0}};
+
+    /* getopt_long stores the option index here. */
+    int option_index = 0;
+
+    c = getopt_long(argc, argv,
+                    "a:b:c:hi:k:l:m:p:s:v:w:", long_options,
+                    &option_index);
+
+    /* Detect the end of the options. */
+    if (c == -1) break;
+
+    switch (c) {
+      case 'a':
+        s.server_addr = optarg;
+        break;
+      case 'b':
+        s.input_mean = strtod(optarg, nullptr);
+        break;
+      case 'c':
+        s.loop_count =
+            strtol(optarg, nullptr, 10);  // NOLINT(runtime/deprecated_fn)
+        break;
+      case 'i':
+        s.input_img_name = optarg;
+        break;
+      case 'k':
+        s.top_k=
+            strtol(optarg, nullptr, 10);  // NOLINT(runtime/deprecated_fn)
+        break;
+      case 'l':
+        s.classes_file_name = optarg;
+        break;
+      case 'm':
+        s.model_name = optarg;
+        break;
+      case 'p':
+        s.server_port = optarg;
+        break;
+      case 's':
+        s.input_std = strtod(optarg, nullptr);
+        break;
+      case 'w':
+        s.number_of_warmup_runs =
+            strtol(optarg, nullptr, 10);  // NOLINT(runtime/deprecated_fn)
+        break;
+      case 'v':
+        s.verbose =
+            strtol(optarg, nullptr, 10);  // NOLINT(runtime/deprecated_fn)
+        break;
+      case 'h':
+      case '?':
+      default:
+        /* getopt_long already printed an error message. */
+        display_usage();
+        exit(-1);
+    }
+  }
+  RunInference(&s);
+  return 0;
+}
+
+
+#if 0
 
 #define FAIL_IF_ERR(X, MSG)                                        \
   {                                                                \
@@ -42,6 +298,28 @@ namespace tc = triton::client;
       exit(1);                                                     \
     }                                                              \
   }
+
+// model inference settings
+struct Settings {
+    int loop_count = 1;
+    int number_of_warmup_runs = 2;
+    int top_k = 1;
+    float input_mean = 127.5f;
+    float input_std = 127.5f;
+    std::string server_addr = "localhost";
+    std::string server_port = "8000";
+    std::string model_name = "classifier_onnx";
+    std::string input_img_name = "./dog.jpg";
+    std::string classes_file_name = "./classes.txt";
+    bool verbose = false;
+};
+
+
+double get_us(struct timeval t)
+{
+    return (t.tv_sec * 1000000 + t.tv_usec);
+}
+
 
 namespace {
 
@@ -336,3 +614,6 @@ main(int argc, char** argv)
 
   return 0;
 }
+
+#endif
+
