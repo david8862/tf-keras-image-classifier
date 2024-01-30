@@ -1,7 +1,6 @@
-## C++ client (X86/ARM) app for Triton inference service
+## C++ client app for Triton inference service
 
 Here are some C++ client app samples for Triton inference service, which could be built with following steps:
-
 
 1. Prepare related package
 
@@ -29,7 +28,8 @@ Build & install protobuf & grpc
         && make -j4
 # make install
 
-# cd ../..
+# cd ../../../
+# mkdir build && cd build
 # cmake [-DCMAKE_TOOLCHAIN_FILE=<cross-compile toolchain file>]
         -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release ..
         && make -j4
@@ -47,7 +47,7 @@ Build & install protobuf & grpc
 ```
 
 
-3. Build demo client application
+3. Build grpc/http demo client application
 ```
 # cd grpc/
 # mkdir build && cd build
@@ -59,3 +59,66 @@ Build & install protobuf & grpc
 # cmake -DTRITON_CLIENT_ROOT_PATH=<Path_to_Triton_client>/src/c++ [-DCMAKE_TOOLCHAIN_FILE=<cross-compile toolchain file>] ..
 # make
 ```
+
+
+4. On server side, prepare onnx model file and run triton service
+```
+# cd ../
+# python model_dump.py
+# ./server_docker_install.sh <model_repository_path>
+```
+
+
+5. Run application to do inference with triton model service
+```
+# cd grpc/build/
+# ./classifier_grpc_client -h
+Usage: classifier_grpc_client
+--server_addr, -a: localhost
+--server_port, -p: 8001
+--model_name, -m: classifier_onnx
+--image, -i: image_name.jpg
+--classes, -l: classes labels for the model
+--top_k, -k: show top k classes result
+--input_mean, -b: input mean
+--input_std, -s: input standard deviation
+--count, -c: loop model run for certain times
+--warmup_runs, -w: number of warmup runs
+--verbose, -v: [0|1] print more information
+
+# ./classifier_grpc_client -a 0.0.0.0 -p 8001 -m classifier_onnx -l ../../../../../configs/imagenet_2012_label_map.txt -i ../../../../../example/cat.jpg -c 5 -w 2 -v 0
+num_classes: 1000
+input tensor info: name image_input, type FP32, dims_size 4, batch 1, height 224, width 224, channels 3
+origin image size: width:480, height:360, channel:3
+output tensor info: name scores, type FP32, dims_size 2, batch 1, classes 1000
+model invoke average time: 82.125ms
+classifier_postprocess time: 0.002ms
+Inferenced class:
+n02124075 Egyptian_cat: 0.849415
+
+# cd ../../http/build/
+# ./classifier_http_client -h
+Usage: classifier_http_client
+--server_addr, -a: localhost
+--server_port, -p: 8000
+--model_name, -m: classifier_onnx
+--image, -i: image_name.jpg
+--classes, -l: classes labels for the model
+--top_k, -k: show top k classes result
+--input_mean, -b: input mean
+--input_std, -s: input standard deviation
+--count, -c: loop model run for certain times
+--warmup_runs, -w: number of warmup runs
+--verbose, -v: [0|1] print more information
+
+# ./classifier_http_client -a 0.0.0.0 -p 8000 -m classifier_onnx -l ../../../../../configs/imagenet_2012_label_map.txt -i ../../../../../example/cat.jpg -c 5 -w 2 -v 0
+num_classes: 1000
+input tensor info: name image_input, type FP32, dims_size 4, batch 1, height 224, width 224, channels 3
+origin image size: width:384, height:287, channel:3
+output tensor info: name scores, type FP32, dims_size 2, batch 1, classes 1000
+model invoke average time: 79.7064ms
+classifier_postprocess time: 0.003ms
+Inferenced class:
+n02124075 Egyptian_cat: 0.849415
+```
+

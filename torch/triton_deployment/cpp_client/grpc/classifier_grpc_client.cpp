@@ -96,7 +96,7 @@ std::string grpc_data_type_str(int data_type)
 }
 
 
-//descend order sort for class prediction records
+// descend order sort for class prediction records
 bool compare_conf(std::pair<uint8_t, float> lpred, std::pair<uint8_t, float> rpred)
 {
     if (lpred.second < rpred.second)
@@ -138,7 +138,7 @@ void classifier_postprocess(const float* score_data, std::vector<std::pair<uint8
 }
 
 
-//Resize image to model input shape
+// Resize image to model input shape
 uint8_t* image_resize(uint8_t* inputImage, int image_width, int image_height, int image_channel, int input_width, int input_height, int input_channel)
 {
     // assume the data channel match
@@ -156,7 +156,7 @@ uint8_t* image_resize(uint8_t* inputImage, int image_width, int image_height, in
 }
 
 
-//Center crop image to model input shape
+// Center crop image to model input shape
 uint8_t* image_crop(uint8_t* inputImage, int image_width, int image_height, int image_channel, int input_width, int input_height, int input_channel)
 {
     // assume the data channel match
@@ -189,7 +189,7 @@ uint8_t* image_crop(uint8_t* inputImage, int image_width, int image_height, int 
 }
 
 
-//Reorder image from channel last to channel first
+// Reorder image from channel last to channel first
 uint8_t* image_reorder(uint8_t* inputImage, int image_width, int image_height, int image_channel)
 {
     uint8_t* reorder_image = (uint8_t*)malloc(image_height * image_width * image_channel * sizeof(uint8_t));
@@ -330,8 +330,8 @@ void RunInference(Settings* s)
     //std::string input_type = grpc_data_type_str(input_config.data_type());
 
     // assume NCHW layout for input
-    auto input_dims = input_config.dims().size();
-    assert(input_dims == 4);
+    auto input_dims_size = input_config.dims().size();
+    assert(input_dims_size == 4);
     int input_batch = input_config.dims(0);
     int input_channel = input_config.dims(1);
     int input_height = input_config.dims(2);
@@ -340,7 +340,7 @@ void RunInference(Settings* s)
     std::cout << "input tensor info: "
               << "name " << input_name << ", "
               << "type " << input_type << ", "
-              << "dim_size " << input_dims << ", "
+              << "dims_size " << input_dims_size << ", "
               << "batch " << input_batch << ", "
               << "height " << input_height << ", "
               << "width " << input_width << ", "
@@ -382,8 +382,6 @@ void RunInference(Settings* s)
 
     // fill input data
     int data_num = input_batch * input_channel * input_height * input_width;
-    std::cout << "data_num: " << data_num << "\n";
-
     std::vector<float> input_data(data_num);
     fill_data(input_data, targetImage,
               input_width, input_height, input_channel, s);
@@ -415,8 +413,8 @@ void RunInference(Settings* s)
     // get output tensor info, assume only 1 output tensor (scores)
     // image_input: 1 x 3 x 224 x 224
     // "scores": 1 x num_classes
-    auto output_dims = output_config.dims().size();
-    assert(output_dims == 2);
+    auto output_dims_size = output_config.dims().size();
+    assert(output_dims_size == 2);
 
     int output_batch = output_config.dims(0);
     int output_classes = output_config.dims(1);
@@ -424,7 +422,7 @@ void RunInference(Settings* s)
     std::cout << "output tensor info: "
               << "name " << output_name << ", "
               << "type " << output_type << ", "
-              << "dim_size " << output_dims << ", "
+              << "dims_size " << output_dims_size << ", "
               << "batch " << output_batch << ", "
               << "classes " << output_classes << "\n";
 

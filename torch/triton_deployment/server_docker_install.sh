@@ -7,6 +7,13 @@
 # https://zhuanlan.zhihu.com/p/574146311
 # https://zhuanlan.zhihu.com/p/361934132
 
+if [[ "$#" -ne 1 ]]; then
+    echo "Usage: $0 <model_repository_path>"
+    exit 1
+fi
+MODEL_REPO_PATH=$1
+
+
 # install CUDA/CuDNN/TensorRT
 
 # clone triton inference server repo
@@ -34,7 +41,7 @@ systemctl restart docker
 
 # get & run triton server docker image
 docker pull nvcr.io/nvidia/tritonserver:23.12-py3
-docker run --gpus=1 --rm -p8000:8000 -p8001:8001 -p8002:8002 -v`pwd`/server/docs/examples/model_repository:/models nvcr.io/nvidia/tritonserver:23.12-py3 tritonserver --model-repository=/models --grpc-use-ssl=false
+docker run --gpus=1 --rm -p8000:8000 -p8001:8001 -p8002:8002 -v$MODEL_REPO_PATH:/models nvcr.io/nvidia/tritonserver:23.12-py3 tritonserver --model-repository=/models --grpc-use-ssl=false
 
 # check if server is ready
 curl -v localhost:8000/v2/health/ready
