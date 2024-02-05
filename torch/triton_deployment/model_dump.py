@@ -74,7 +74,7 @@ def main():
         help="model image input shape as <height>x<width>, default=%(default)s")
     parser.add_argument('--batch_size', type=int, required=False, default=1,
         help="batch size for inference, default=%(default)s")
-    parser.add_argument('--output_path', type=str, required=False, default=os.path.join('classifier_onnx', '1'),
+    parser.add_argument('--output_path', type=str, required=False, default=os.path.join('model_repository', 'classifier_onnx', '1'),
         help='output path to save dumped model, default=%(default)s')
 
     args = parser.parse_args()

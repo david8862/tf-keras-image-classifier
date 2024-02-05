@@ -42,7 +42,8 @@ Build & install protobuf & grpc
 # git clone https://github.com/triton-inference-server/client.git
 # cd client/src/c++/
 # mkdir build && cd build
-# cmake -DTRITON_ENABLE_CC_HTTP=ON -DTRITON_ENABLE_CC_GRPC=ON -DTRITON_ENABLE_ZLIB=OFF -DTRITON_ENABLE_EXAMPLES=OFF ..
+# cmake [-DCMAKE_TOOLCHAIN_FILE=<cross-compile toolchain file>]
+        -DTRITON_ENABLE_CC_HTTP=ON -DTRITON_ENABLE_CC_GRPC=ON -DTRITON_ENABLE_ZLIB=OFF -DTRITON_ENABLE_EXAMPLES=OFF ..
 # make -j4
 ```
 
@@ -88,9 +89,9 @@ Usage: classifier_grpc_client
 
 # ./classifier_grpc_client -a 0.0.0.0 -p 8001 -m classifier_onnx -l ../../../../../configs/imagenet_2012_label_map.txt -i ../../../../../example/cat.jpg -c 5 -w 2 -v 0
 num_classes: 1000
-input tensor info: name image_input, type FP32, dims_size 4, batch 1, height 224, width 224, channels 3
+input tensor info: name image_input, type FP32, shape_size 4, layout NCHW, batch 1, height 224, width 224, channels 3
 origin image size: width:480, height:360, channel:3
-output tensor info: name scores, type FP32, dims_size 2, batch 1, classes 1000
+output tensor info: name scores, type FP32, shape_size 2, batch 1, classes 1000
 model invoke average time: 82.125ms
 classifier_postprocess time: 0.002ms
 Inferenced class:
@@ -113,9 +114,9 @@ Usage: classifier_http_client
 
 # ./classifier_http_client -a 0.0.0.0 -p 8000 -m classifier_onnx -l ../../../../../configs/imagenet_2012_label_map.txt -i ../../../../../example/cat.jpg -c 5 -w 2 -v 0
 num_classes: 1000
-input tensor info: name image_input, type FP32, dims_size 4, batch 1, height 224, width 224, channels 3
+input tensor info: name image_input, type FP32, shape_size 4, layout NCHW, batch 1, height 224, width 224, channels 3
 origin image size: width:384, height:287, channel:3
-output tensor info: name scores, type FP32, dims_size 2, batch 1, classes 1000
+output tensor info: name scores, type FP32, shape_size 2, batch 1, classes 1000
 model invoke average time: 79.7064ms
 classifier_postprocess time: 0.003ms
 Inferenced class:

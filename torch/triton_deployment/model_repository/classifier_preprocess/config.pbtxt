@@ -1,0 +1,28 @@
+name: "classifier_preprocess"
+backend: "python"
+max_batch_size: 2
+input [
+  {
+    name: "input_image"
+    data_type: TYPE_UINT8
+    dims: [ -1 ]
+  }
+]
+output [
+  {
+    name: "preprocessed_image"
+    data_type: TYPE_FP32
+    dims: [ 3, 224, 224 ]
+  }
+]
+instance_group [
+  {
+    count: 1
+    kind: KIND_CPU
+  }
+]
+version_policy: { all {} }
+dynamic_batching {
+  #preferred_batch_size: [ 4, 8 ]
+  max_queue_delay_microseconds: 100
+}

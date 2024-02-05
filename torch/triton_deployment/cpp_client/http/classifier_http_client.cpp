@@ -291,7 +291,8 @@ void RunInference(Settings* s)
         std::cout << "\nServer Metadata:\n" << server_metadata << std::endl;
     }
 
-    // get model metadata
+    // get model metadata, here
+    // we will use metadata to parse model info
     std::string model_metadata;
     err = client->ModelMetadata(&model_metadata, s->model_name, model_version);
     if (!err.IsOk()) {
@@ -350,6 +351,7 @@ void RunInference(Settings* s)
         exit(1);
     }
 
+#if 0
     // check input/output num in config
     const auto& input_config_itr = model_config_json.FindMember("input");
     input_count = 0;
@@ -372,10 +374,11 @@ void RunInference(Settings* s)
                   << std::endl;
         exit(1);
     }
+#endif
 
     // parse input metadata & config
     const auto& input_metadata = *input_itr->value.Begin();
-    const auto& input_config = *input_config_itr->value.Begin();
+    //const auto& input_config = *input_config_itr->value.Begin();
 
     const auto& input_name_itr = input_metadata.FindMember("name");
     if (input_name_itr == input_metadata.MemberEnd()) {
@@ -393,25 +396,39 @@ void RunInference(Settings* s)
     }
     std::string input_type = std::string(input_dtype_itr->value.GetString(), input_dtype_itr->value.GetStringLength());
 
-    // assume NCHW layout for input
-    const auto& input_dims_itr = input_config.FindMember("dims");
-    if (input_dims_itr == input_config.MemberEnd()) {
-        std::cerr << "input missing dims in the config for model'"
+    // check input layout (NCHW/NHWC) and get shape
+    const auto& input_shape_itr = input_metadata.FindMember("shape");
+    if (input_shape_itr == input_metadata.MemberEnd()) {
+        std::cerr << "input missing shape in the metadata for model'"
                   << model_metadata_json["name"].GetString() << "'" << std::endl;
         exit(1);
     }
-    size_t input_dims_size = input_dims_itr->value.Size();
-    assert(input_dims_size == 4);
+    size_t input_shape_size = input_shape_itr->value.Size();
+    assert(input_shape_size == 4);
 
-    int input_batch = input_dims_itr->value[0].GetInt();
-    int input_channel = input_dims_itr->value[1].GetInt();
-    int input_height = input_dims_itr->value[2].GetInt();
-    int input_width = input_dims_itr->value[3].GetInt();
+    std::string input_layout;
+    int input_batch, input_height, input_width, input_channel;
+    if (input_shape_itr->value[1].GetInt() == 3) {
+        // NCHW
+        input_layout = "NCHW";
+        input_batch = input_shape_itr->value[0].GetInt();
+        input_channel = input_shape_itr->value[1].GetInt();
+        input_height = input_shape_itr->value[2].GetInt();
+        input_width = input_shape_itr->value[3].GetInt();
+    } else {
+        // NHWC
+        input_layout = "NHWC";
+        input_batch = input_shape_itr->value[0].GetInt();
+        input_height = input_shape_itr->value[1].GetInt();
+        input_width = input_shape_itr->value[2].GetInt();
+        input_channel = input_shape_itr->value[3].GetInt();
+    }
 
     std::cout << "input tensor info: "
               << "name " << input_name << ", "
               << "type " << input_type << ", "
-              << "dims_size " << input_dims_size << ", "
+              << "shape_size " << input_shape_size << ", "
+              << "layout " << input_layout << ", "
               << "batch " << input_batch << ", "
               << "height " << input_height << ", "
               << "width " << input_width << ", "
@@ -420,7 +437,10 @@ void RunInference(Settings* s)
     // assume input tensor type is fp32
     assert(input_type == "FP32");
     assert(input_batch == 1);
-    std::vector<int64_t> input_shape{input_batch, input_channel, input_height, input_width};
+    std::vector<int64_t> input_shape{input_shape_itr->value[0].GetInt(),
+                                     input_shape_itr->value[1].GetInt(),
+                                     input_shape_itr->value[2].GetInt(),
+                                     input_shape_itr->value[3].GetInt()};
 
     // load input image
     auto inputPath = s->input_img_name.c_str();
@@ -444,12 +464,14 @@ void RunInference(Settings* s)
 
     uint8_t* targetImage = cropedImage;
 
-    // convert image data from NHWC to NCHW
-    uint8_t* reorderImage = image_reorder(cropedImage, input_width, input_height, input_channel);
-    // free croped image
-    free(cropedImage);
-    cropedImage = nullptr;
-    targetImage = reorderImage;
+    if (input_layout == "NCHW") {
+        // convert image data from NHWC to NCHW
+        uint8_t* reorderImage = image_reorder(cropedImage, input_width, input_height, input_channel);
+        // free croped image
+        free(cropedImage);
+        cropedImage = nullptr;
+        targetImage = reorderImage;
+    }
 
     // fill input data
     int data_num = input_batch * input_channel * input_height * input_width;
@@ -474,7 +496,7 @@ void RunInference(Settings* s)
 
     // parse output metadata & config
     const auto& output_metadata = *output_itr->value.Begin();
-    const auto& output_config = *output_config_itr->value.Begin();
+    //const auto& output_config = *output_config_itr->value.Begin();
 
     const auto& output_name_itr = output_metadata.FindMember("name");
     if (output_name_itr == output_metadata.MemberEnd()) {
@@ -495,22 +517,22 @@ void RunInference(Settings* s)
     // get output tensor info, assume only 1 output tensor (scores)
     // image_input: 1 x 3 x 224 x 224
     // "scores": 1 x num_classes
-    const auto& output_dims_itr = output_config.FindMember("dims");
-    if (output_dims_itr == output_config.MemberEnd()) {
-        std::cerr << "output missing dims in the config for model'"
+    const auto& output_shape_itr = output_metadata.FindMember("shape");
+    if (output_shape_itr == output_metadata.MemberEnd()) {
+        std::cerr << "output missing shape in the metadata for model'"
                   << model_metadata_json["name"].GetString() << "'" << std::endl;
         exit(1);
     }
-    size_t output_dims_size = output_dims_itr->value.Size();
-    assert(output_dims_size == 2);
+    size_t output_shape_size = output_shape_itr->value.Size();
+    assert(output_shape_size == 2);
 
-    int output_batch = output_dims_itr->value[0].GetInt();
-    int output_classes = output_dims_itr->value[1].GetInt();
+    int output_batch = output_shape_itr->value[0].GetInt();
+    int output_classes = output_shape_itr->value[1].GetInt();
 
     std::cout << "output tensor info: "
               << "name " << output_name << ", "
               << "type " << output_type << ", "
-              << "dims_size " << output_dims_size << ", "
+              << "shape_size " << output_shape_size << ", "
               << "batch " << output_batch << ", "
               << "classes " << output_classes << "\n";
 

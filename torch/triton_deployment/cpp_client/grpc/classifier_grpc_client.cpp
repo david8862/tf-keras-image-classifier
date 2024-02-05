@@ -293,14 +293,6 @@ void RunInference(Settings* s)
         exit(1);
     }
 
-    // get model metadata
-    inference::ModelMetadataResponse model_metadata;
-    err = client->ModelMetadata(&model_metadata, s->model_name, model_version);
-    if (!err.IsOk()) {
-        std::cerr << "error: failed to get model metadata: " << err << std::endl;
-        exit(1);
-    }
-
     // get model config
     inference::ModelConfigResponse model_config;
     err = client->ModelConfig(&model_config, s->model_name, model_version);
@@ -308,39 +300,63 @@ void RunInference(Settings* s)
         std::cerr << "error: failed to get model config: " << err << std::endl;
     }
 
-    // check input/output num
-    if (model_config.config().input().size() != 1) {
-        std::cerr << "expecting 1 input in model configuration, got "
-            << model_config.config().input().size() << std::endl;
+    // get model metadata, here
+    // we will use metadata to parse model info
+    inference::ModelMetadataResponse model_metadata;
+    err = client->ModelMetadata(&model_metadata, s->model_name, model_version);
+    if (!err.IsOk()) {
+        std::cerr << "error: failed to get model metadata: " << err << std::endl;
         exit(1);
     }
-    if (model_config.config().output().size() != 1) {
-        std::cerr << "expecting 1 output in model configuration, got "
-            << model_config.config().output().size() << std::endl;
+
+    // check input/output num
+    if (model_metadata.inputs().size() != 1) {
+        std::cerr << "expecting 1 input in model metadata, got "
+            << model_metadata.inputs().size() << std::endl;
+        exit(1);
+    }
+    if (model_metadata.outputs().size() != 1) {
+        std::cerr << "expecting 1 output in model metadata, got "
+            << model_metadata.outputs().size() << std::endl;
         exit(1);
     }
 
     // parse input metadata & config
     auto input_metadata = model_metadata.inputs(0);
-    auto input_config = model_config.config().input(0);
+    //auto input_config = model_config.config().input(0);
 
     std::string input_name = input_metadata.name();
     std::string input_type = input_metadata.datatype();
     //std::string input_name = input_config.name();
     //std::string input_type = grpc_data_type_str(input_config.data_type());
 
-    // assume NCHW layout for input
-    auto input_dims_size = input_config.dims().size();
-    assert(input_dims_size == 4);
-    int input_batch = input_config.dims(0);
-    int input_channel = input_config.dims(1);
-    int input_height = input_config.dims(2);
-    int input_width = input_config.dims(3);
+    // check input layout (NCHW/NHWC) and get shape
+    auto input_shape_size = input_metadata.shape().size();
+    assert(input_shape_size == 4);
+
+    std::string input_layout;
+    int input_batch, input_height, input_width, input_channel;
+    if (input_metadata.shape(1) == 3) {
+        // NCHW
+        input_layout = "NCHW";
+        input_batch = input_metadata.shape(0);
+        input_channel = input_metadata.shape(1);
+        input_height = input_metadata.shape(2);
+        input_width = input_metadata.shape(3);
+    } else {
+        // NHWC
+        input_layout = "NHWC";
+        input_batch = input_metadata.shape(0);
+        input_height = input_metadata.shape(1);
+        input_width = input_metadata.shape(2);
+        input_channel = input_metadata.shape(3);
+    }
 
     std::cout << "input tensor info: "
               << "name " << input_name << ", "
               << "type " << input_type << ", "
-              << "dims_size " << input_dims_size << ", "
+              << "shape_size " << input_shape_size << ", "
+              << "layout " << input_layout << ", "
               << "batch " << input_batch << ", "
               << "height " << input_height << ", "
               << "width " << input_width << ", "
@@ -349,7 +365,10 @@ void RunInference(Settings* s)
     // assume input tensor type is fp32
     assert(input_type == "FP32");
     assert(input_batch == 1);
-    std::vector<int64_t> input_shape{input_batch, input_channel, input_height, input_width};
+    std::vector<int64_t> input_shape{input_metadata.shape(0),
+                                     input_metadata.shape(1),
+                                     input_metadata.shape(2),
+                                     input_metadata.shape(3)};
 
     // load input image
     auto inputPath = s->input_img_name.c_str();
@@ -373,15 +392,17 @@ void RunInference(Settings* s)
 
     uint8_t* targetImage = cropedImage;
 
-    // convert image data from NHWC to NCHW
-    uint8_t* reorderImage = image_reorder(cropedImage, input_width, input_height, input_channel);
-    // free croped image
-    free(cropedImage);
-    cropedImage = nullptr;
-    targetImage = reorderImage;
+    if (input_layout == "NCHW") {
+        // convert image data from NHWC to NCHW
+        uint8_t* reorderImage = image_reorder(cropedImage, input_width, input_height, input_channel);
+        // free croped image
+        free(cropedImage);
+        cropedImage = nullptr;
+        targetImage = reorderImage;
+    }
 
     // fill input data
-    int data_num = input_batch * input_channel * input_height * input_width;
+    int data_num = input_batch * input_height * input_width * input_channel;
     std::vector<float> input_data(data_num);
     fill_data(input_data, targetImage,
               input_width, input_height, input_channel, s);
@@ -403,7 +424,7 @@ void RunInference(Settings* s)
 
     // parse output metadata & config
     auto output_metadata = model_metadata.outputs(0);
-    auto output_config = model_config.config().output(0);
+    //auto output_config = model_config.config().output(0);
 
     std::string output_name = output_metadata.name();
     std::string output_type = output_metadata.datatype();
@@ -413,16 +434,16 @@ void RunInference(Settings* s)
     // get output tensor info, assume only 1 output tensor (scores)
     // image_input: 1 x 3 x 224 x 224
     // "scores": 1 x num_classes
-    auto output_dims_size = output_config.dims().size();
-    assert(output_dims_size == 2);
+    auto output_shape_size = output_metadata.shape().size();
+    assert(output_shape_size == 2);
 
-    int output_batch = output_config.dims(0);
-    int output_classes = output_config.dims(1);
+    int output_batch = output_metadata.shape(0);
+    int output_classes = output_metadata.shape(1);
 
     std::cout << "output tensor info: "
               << "name " << output_name << ", "
               << "type " << output_type << ", "
-              << "dims_size " << output_dims_size << ", "
+              << "shape_size " << output_shape_size << ", "
               << "batch " << output_batch << ", "
               << "classes " << output_classes << "\n";
 
