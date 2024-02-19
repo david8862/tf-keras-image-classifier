@@ -45,7 +45,7 @@ struct Settings {
     float input_mean = 127.5f;
     float input_std = 127.5f;
     std::string server_addr = "localhost";
-    std::string server_port = "8001";
+    std::string server_port = "8000";
     std::string model_name = "classifier_onnx";
     std::string input_img_name = "./dog.jpg";
     std::string classes_file_name = "./classes.txt";
@@ -76,7 +76,7 @@ ParseJson(rapidjson::Document* document, const std::string& json_str)
 
 
 // descend order sort for class prediction records
-bool compare_conf(std::pair<uint8_t, float> lpred, std::pair<uint8_t, float> rpred)
+bool compare_conf(std::pair<int, float> lpred, std::pair<int, float> rpred)
 {
     if (lpred.second < rpred.second)
         return false;
@@ -86,7 +86,7 @@ bool compare_conf(std::pair<uint8_t, float> lpred, std::pair<uint8_t, float> rpr
 
 
 // CNN Classifier postprocess
-void classifier_postprocess(const float* score_data, std::vector<std::pair<uint8_t, float>> &class_results, std::vector<int64_t> shape)
+void classifier_postprocess(const float* score_data, std::vector<std::pair<int, float>> &class_results, std::vector<int64_t> shape)
 {
     // 1. do following transform to get sorted class index & score:
     //
@@ -102,7 +102,7 @@ void classifier_postprocess(const float* score_data, std::vector<std::pair<uint8
     // class = np.argsort(pred, axis=-1)
     // class = class[::-1]
     //
-    uint8_t class_index = 0;
+    int class_index = 0;
     float max_score = 0.0;
     for (int i = 0; i < class_size; i++) {
         class_results.emplace_back(std::make_pair(i, score_data[i]));
@@ -628,7 +628,7 @@ void RunInference(Settings* s)
         exit(1);
     }
 
-    std::vector<std::pair<uint8_t, float>> class_results;
+    std::vector<std::pair<int, float>> class_results;
     gettimeofday(&start_time, nullptr);
     classifier_postprocess(result_data, class_results, result_shape);
     gettimeofday(&stop_time, nullptr);

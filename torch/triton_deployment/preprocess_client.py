@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+Triton http/grpc client for classifier preprocess model
+"""
 import os, sys, argparse
 import time
 import glob
@@ -157,9 +160,12 @@ def handle_prediction(image_data, layout, image_file, output_path):
     if layout == "NCHW":
         image_data = np.transpose(image_data, (1, 2, 0))
 
+    # here we denormalize the preprocessed data back
+    # to image, to check if the preprocess model
+    # works correct
     image = denormalize_image(image_data)
 
-    # save or show result
+    # save or show image
     if output_path:
         os.makedirs(output_path, exist_ok=True)
         output_file = os.path.join(output_path, os.path.basename(image_file))

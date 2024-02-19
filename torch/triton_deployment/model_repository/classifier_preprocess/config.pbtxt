@@ -1,16 +1,16 @@
 name: "classifier_preprocess"
 backend: "python"
-max_batch_size: 2
+max_batch_size: 256
 input [
   {
-    name: "input_image"
+    name: "raw_image"
     data_type: TYPE_UINT8
     dims: [ -1 ]
   }
 ]
 output [
   {
-    name: "preprocessed_image"
+    name: "network_input_image"
     data_type: TYPE_FP32
     dims: [ 3, 224, 224 ]
   }

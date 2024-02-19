@@ -62,10 +62,10 @@ Build & install protobuf & grpc
 ```
 
 
-4. On server side, prepare onnx model file and run triton service
+4. On server side, prepare imagenet pretrained onnx model file and run triton service
 ```
 # cd ../
-# python model_dump.py
+# python imagenet_model_dump.py
 # ./server_docker_install.sh <model_repository_path>
 ```
 
@@ -87,15 +87,38 @@ Usage: classifier_grpc_client
 --warmup_runs, -w: number of warmup runs
 --verbose, -v: [0|1] print more information
 
-# ./classifier_grpc_client -a 0.0.0.0 -p 8001 -m classifier_onnx -l ../../../../../configs/imagenet_2012_label_map.txt -i ../../../../../example/cat.jpg -c 5 -w 2 -v 0
+# ./classifier_grpc_client -a 0.0.0.0 -p 8001 -m classifier_onnx -l ../../../../../configs/imagenet_2012_classes.txt -i ../../../../../example/cat.jpg -c 5 -w 2 -v 0
 num_classes: 1000
 input tensor info: name image_input, type FP32, shape_size 4, layout NCHW, batch 1, height 224, width 224, channels 3
 origin image size: width:480, height:360, channel:3
 output tensor info: name scores, type FP32, shape_size 2, batch 1, classes 1000
-model invoke average time: 82.125ms
-classifier_postprocess time: 0.002ms
+model invoke average time: 81.5562ms
+classifier_postprocess time: 0.182ms
 Inferenced class:
-n02124075 Egyptian_cat: 0.849415
+Persian_cat: 0.205846
+
+# ./pipeline_grpc_client -h
+Usage: classifier_grpc_client
+--server_addr, -a: localhost
+--server_port, -p: 8001
+--model_name, -m: classifier_pipeline
+--image, -i: image_name.jpg
+--classes, -l: classes labels for the model
+--top_k, -k: show top k classes result
+--count, -c: loop model run for certain times
+--warmup_runs, -w: number of warmup runs
+--verbose, -v: [0|1] print more information
+
+# ./pipeline_grpc_client -a 0.0.0.0 -p 8001 -m classifier_pipeline -l ../../../../../configs/imagenet_2012_classes.txt -i ../../../../../example/cat.jpg -c 5 -w 2 -v 0
+num_classes: 1000
+input tensor info: name input, type UINT8, shape (-1,-1,)
+origin image size: width:480, height:360, channel:3
+output tensor info: name output, type FP32, shape (-1,1,1000,), batch 1, classes 1000
+model invoke average time: 46.7676ms
+classifier_postprocess time: 0.175ms
+Inferenced class:
+lynx: 0.441083
+
 
 # cd ../../http/build/
 # ./classifier_http_client -h
@@ -112,14 +135,36 @@ Usage: classifier_http_client
 --warmup_runs, -w: number of warmup runs
 --verbose, -v: [0|1] print more information
 
-# ./classifier_http_client -a 0.0.0.0 -p 8000 -m classifier_onnx -l ../../../../../configs/imagenet_2012_label_map.txt -i ../../../../../example/cat.jpg -c 5 -w 2 -v 0
+# ./classifier_http_client -a 0.0.0.0 -p 8000 -m classifier_onnx -l ../../../../../configs/imagenet_2012_classes.txt -i ../../../../../example/cat.jpg -c 5 -w 2 -v 0
 num_classes: 1000
 input tensor info: name image_input, type FP32, shape_size 4, layout NCHW, batch 1, height 224, width 224, channels 3
-origin image size: width:384, height:287, channel:3
+origin image size: width:480, height:360, channel:3
 output tensor info: name scores, type FP32, shape_size 2, batch 1, classes 1000
-model invoke average time: 79.7064ms
-classifier_postprocess time: 0.003ms
+model invoke average time: 82.0538ms
+classifier_postprocess time: 0.177ms
 Inferenced class:
-n02124075 Egyptian_cat: 0.849415
+Persian_cat: 0.205846
+
+# ./pipeline_http_client -h
+Usage: pipeline_http_client
+--server_addr, -a: localhost
+--server_port, -p: 8000
+--model_name, -m: classifier_pipeline
+--image, -i: image_name.jpg
+--classes, -l: classes labels for the model
+--top_k, -k: show top k classes result
+--count, -c: loop model run for certain times
+--warmup_runs, -w: number of warmup runs
+--verbose, -v: [0|1] print more information
+
+# ./pipeline_http_client -a 0.0.0.0 -p 8000 -m classifier_pipeline -l ../../../../../configs/imagenet_2012_classes.txt -i ../../../../../example/cat.jpg -c 5 -w 2 -v 0
+num_classes: 1000
+input tensor info: name input, type UINT8, shape (-1,-1,)
+origin image size: width:480, height:360, channel:3
+output tensor info: name output, type FP32, shape (-1,1,1000,), batch 1, classes 1000
+model invoke average time: 45.5586ms
+classifier_postprocess time: 0.096ms
+Inferenced class:
+lynx: 0.441083
 ```
 

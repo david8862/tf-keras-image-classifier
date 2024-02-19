@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Triton http/grpc client for classifier model
-
-Reference from:
-    https://blog.csdn.net/sgyuanshi/article/details/123536579
-    https://github.com/QunBB/DeepLearning/blob/main/triton/client/_http.py
+Triton http/grpc client for classifier pipeline
 """
 import os, sys, argparse
 import time
@@ -18,11 +14,10 @@ import tritonclient.http as httpclient
 import tritonclient.grpc as grpcclient
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
-from common.data_utils import preprocess_image
 from common.utils import get_classes
 
 
-def classifier_http_client(server_addr, server_port, model_name, image_files, class_names, output_path):
+def classifier_pipeline_http_client(server_addr, server_port, model_name, image_files, class_names, output_path):
     # init triton http client
     server_url = server_addr + ':' + server_port
     triton_client = httpclient.InferenceServerClient(url=server_url, verbose=False, ssl=False, ssl_options={}, insecure=False, ssl_context_factory=None)
@@ -48,42 +43,28 @@ def classifier_http_client(server_addr, server_port, model_name, image_files, cl
     output_type = outputs_metadata[0]['datatype']
 
     # check input & output metadata
-    assert input_type == 'FP32', 'invalid input type.'
+    assert input_type == 'UINT8', 'invalid input type.'
     assert output_type == 'FP32', 'invalid output type.'
 
-    assert len(inputs_metadata[0]['shape']) == 4, 'invalid input shape.'
-
-    # check if input layout is NHWC or NCHW
-    if inputs_metadata[0]['shape'][1] == 3:
-        print("NCHW input layout")
-        batch, channel, height, width = inputs_metadata[0]['shape']  #NCHW
-    else:
-        print("NHWC input layout")
-        batch, height, width, channel = inputs_metadata[0]['shape']  #NHWC
-
-    model_input_shape = (height, width)
-
-    assert len(outputs_metadata[0]['shape']) == 2, 'invalid output shape.' # (1, num_classes)
-    num_classes = outputs_metadata[0]['shape'][1]
+    assert len(outputs_metadata[0]['shape']) == 3, 'invalid output shape.' # (-1, 1, num_classes)
+    num_classes = outputs_metadata[0]['shape'][-1]
     if class_names:
         # check if classes number match with model prediction
         assert num_classes == len(class_names), 'classes number mismatch with model.'
 
     # loop the sample list to predict on each image
     for image_file in image_files:
-        # prepare input image
-        image = Image.open(image_file).convert('RGB')
-        image_data = preprocess_image(image, target_size=model_input_shape, return_tensor=False)
+        # load input image
+        image_data = np.fromfile(image_file, dtype="uint8")
         image_data = np.expand_dims(image_data, axis=0)
 
         # prepare input/output list
         inputs = []
-        inputs.append(httpclient.InferInput(input_name, image_data.shape, "FP32"))
+        inputs.append(httpclient.InferInput(input_name, image_data.shape, "UINT8"))
         inputs[0].set_data_from_numpy(image_data, binary_data=False)
 
         outputs = []
         outputs.append(httpclient.InferRequestedOutput(output_name, binary_data=False))
-        #outputs.append(httpclient.InferRequestedOutput(output_name, binary_data=False, class_count=3))  # class_count for topN result
 
         # do inference to get prediction
         start = time.time()
@@ -92,49 +73,14 @@ def classifier_http_client(server_addr, server_port, model_name, image_files, cl
         print("Inference time: {:.8f}ms".format((end - start) * 1000))
 
         result = prediction.as_numpy(output_name)
-        handle_prediction(result, image_file, np.array(image), class_names, output_path)
+        handle_prediction(result[0], image_file, class_names, output_path)
 
     # close triton http client
     triton_client.close()
 
 
 
-def grpc_data_type_str(data_type):
-    if data_type == 0:
-        return 'TYPE_INVALID'
-    elif data_type == 1:
-        return 'TYPE_BOOL'
-    elif data_type == 2:
-        return 'TYPE_UINT8'
-    elif data_type == 3:
-        return 'TYPE_UINT16'
-    elif data_type == 4:
-        return 'TYPE_UINT32'
-    elif data_type == 5:
-        return 'TYPE_UINT64'
-    elif data_type == 6:
-        return 'TYPE_INT8'
-    elif data_type == 7:
-        return 'TYPE_INT16'
-    elif data_type == 8:
-        return 'TYPE_INT32'
-    elif data_type == 9:
-        return 'TYPE_INT64'
-    elif data_type == 10:
-        return 'TYPE_FP16'
-    elif data_type == 11:
-        return 'TYPE_FP32'
-    elif data_type == 12:
-        return 'TYPE_FP64'
-    elif data_type == 13:
-        return 'TYPE_STRING'
-    elif data_type == 14:
-        return 'TYPE_BF16'
-    else:
-        raise ValueError('invalid data_type: ' + data_type)
-
-
-def classifier_grpc_client(server_addr, server_port, model_name, image_files, class_names, output_path):
+def classifier_pipeline_grpc_client(server_addr, server_port, model_name, image_files, class_names, output_path):
     # init triton grpc client
     server_url = server_addr + ':' + server_port
     triton_client = grpcclient.InferenceServerClient(url=server_url, verbose=False, ssl=False)
@@ -160,42 +106,28 @@ def classifier_grpc_client(server_addr, server_port, model_name, image_files, cl
     output_type = outputs_metadata[0].datatype
 
     # check input & output metadata
-    assert input_type == 'FP32', 'invalid input type.'
+    assert input_type == 'UINT8', 'invalid input type.'
     assert output_type == 'FP32', 'invalid output type.'
 
-    assert len(inputs_metadata[0].shape) == 4, 'invalid input shape.'
-
-    # check if input layout is NHWC or NCHW
-    if inputs_metadata[0].shape[1] == 3:
-        print("NCHW input layout")
-        batch, channel, height, width = inputs_metadata[0].shape  #NCHW
-    else:
-        print("NHWC input layout")
-        batch, height, width, channel = inputs_metadata[0].shape  #NHWC
-
-    model_input_shape = (height, width)
-
-    assert len(outputs_metadata[0].shape) == 2, 'invalid output shape.' # (1, num_classes)
-    num_classes = outputs_metadata[0].shape[1]
+    assert len(outputs_metadata[0].shape) == 3, 'invalid output shape.' # (-1, 1, num_classes)
+    num_classes = outputs_metadata[0].shape[-1]
     if class_names:
         # check if classes number match with model prediction
         assert num_classes == len(class_names), 'classes number mismatch with model.'
 
     # loop the sample list to predict on each image
     for image_file in image_files:
-        # prepare input image
-        image = Image.open(image_file).convert('RGB')
-        image_data = preprocess_image(image, target_size=model_input_shape, return_tensor=False)
+        # load input image
+        image_data = np.fromfile(image_file, dtype="uint8")
         image_data = np.expand_dims(image_data, axis=0)
 
         # prepare input/output list
         inputs = []
-        inputs.append(grpcclient.InferInput(input_name, image_data.shape, "FP32"))
+        inputs.append(grpcclient.InferInput(input_name, image_data.shape, "UINT8"))
         inputs[0].set_data_from_numpy(image_data)
 
         outputs = []
         outputs.append(grpcclient.InferRequestedOutput(output_name))
-        #outputs.append(grpcclient.InferRequestedOutput(output_name, class_count=3))  # class_count for topN result
 
         # do inference to get prediction
         start = time.time()
@@ -204,14 +136,14 @@ def classifier_grpc_client(server_addr, server_port, model_name, image_files, cl
         print("Inference time: {:.8f}ms".format((end - start) * 1000))
 
         result = prediction.as_numpy(output_name)
-        handle_prediction(result, image_file, np.array(image), class_names, output_path)
+        handle_prediction(result[0], image_file, class_names, output_path)
 
     # close triton grpc client
     triton_client.close()
 
 
 
-def handle_prediction(prediction, image_file, image, class_names, output_path):
+def handle_prediction(prediction, image_file, class_names, output_path):
     indexes = np.argsort(prediction[0])
     indexes = indexes[::-1]
     #only pick top-1 class index
@@ -221,6 +153,7 @@ def handle_prediction(prediction, image_file, image, class_names, output_path):
     result = '{name}:{conf:.3f}'.format(name=class_names[index] if class_names else index, conf=float(score))
     print('Class result\n', result)
 
+    image = np.array(Image.open(image_file).convert('RGB'))
     cv2.putText(image, result,
                 (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX,
@@ -241,12 +174,12 @@ def handle_prediction(prediction, image_file, image, class_names, output_path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='classifier http/grpc client for triton inference server')
+    parser = argparse.ArgumentParser(description='classifier pipeline http/grpc client for triton inference server')
     parser.add_argument('--server_addr', type=str, required=False, default='localhost',
         help='triton server address, default=%(default)s')
     parser.add_argument('--server_port', type=str, required=False, default='8000',
         help='triton server port (8000 for http & 8001 for grpc), default=%(default)s')
-    parser.add_argument('--model_name', type=str, required=False, default='classifier_onnx',
+    parser.add_argument('--model_name', type=str, required=False, default='classifier_pipeline',
         help='model name for inference, default=%(default)s')
     parser.add_argument('--image_path', type=str, required=True,
         help="image file or directory to inference")
@@ -271,9 +204,9 @@ def main():
         image_files = [args.image_path]
 
     if args.protocol == 'http':
-        classifier_http_client(args.server_addr, args.server_port, args.model_name, image_files, class_names, args.output_path)
+        classifier_pipeline_http_client(args.server_addr, args.server_port, args.model_name, image_files, class_names, args.output_path)
     elif args.protocol == 'grpc':
-        classifier_grpc_client(args.server_addr, args.server_port, args.model_name, image_files, class_names, args.output_path)
+        classifier_pipeline_grpc_client(args.server_addr, args.server_port, args.model_name, image_files, class_names, args.output_path)
     else:
         raise ValueError('invalid protocol: ' + args.protocol)
 

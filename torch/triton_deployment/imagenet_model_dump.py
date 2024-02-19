@@ -3,6 +3,9 @@
 import os, sys, argparse
 import numpy as np
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torchsummary import summary
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
 from torchvision.models import resnet50
@@ -17,38 +20,57 @@ from common.backbones.hbonet import hbonet
 from common.backbones.mobilevit import mobilevit_s, mobilevit_xs, mobilevit_xxs
 
 
-def model_dump(model_type, model_input_shape, batch_size, output_path):
+class Classifier(nn.Module):
+    def __init__(self, model_type):
+        super(Classifier, self).__init__()
+        self.base_model = self.get_basemodel(model_type)
 
-    if model_type == 'mobilenetv2':
-        width_mult=0.5
-        model = mobilenetv2(pretrained=True, width_mult=width_mult)
-    elif model_type == 'mobilenetv3large':
-        width_mult=0.75
-        model = mobilenetv3_large(pretrained=True, width_mult=width_mult)
-    elif model_type == 'mobilenetv3small':
-        width_mult=0.75
-        model = mobilenetv3_small(pretrained=True, width_mult=width_mult)
-    elif model_type == 'peleenet':
-        model = peleenet(pretrained=True, weights_path=None)
-    elif model_type == 'csppeleenet':
-        model = csppeleenet(pretrained=True)
-    elif model_type == 'shufflenetv2':
-        model = shufflenet_v2_x1_0(pretrained=True, progress=True)
-    elif model_type == 'ghostnet':
-        model = ghostnet(pretrained=True, weights_path=None)
-    elif model_type == 'hbonet':
-        width_mult=0.5
-        model = hbonet(pretrained=True, width_mult=width_mult)
-    elif model_type == 'mobilevit_s':
-        model = mobilevit_s(pretrained=False)
-    elif model_type == 'mobilevit_xs':
-        model = mobilevit_xs(pretrained=False)
-    elif model_type == 'mobilevit_xxs':
-        model = mobilevit_xxs(pretrained=False)
-    elif model_type == 'resnet50':
-        model = resnet50(pretrained=True, progress=True)
-    else:
-        raise ValueError('Unsupported model type')
+    def get_basemodel(self, model_type):
+        if model_type == 'mobilenetv2':
+            width_mult=0.5
+            base_model = mobilenetv2(pretrained=True, width_mult=width_mult)
+        elif model_type == 'mobilenetv3large':
+            width_mult=0.75
+            base_model = mobilenetv3_large(pretrained=True, width_mult=width_mult)
+        elif model_type == 'mobilenetv3small':
+            width_mult=0.75
+            base_model = mobilenetv3_small(pretrained=True, width_mult=width_mult)
+        elif model_type == 'peleenet':
+            base_model = peleenet(pretrained=True, weights_path=None)
+        elif model_type == 'csppeleenet':
+            base_model = csppeleenet(pretrained=True)
+        elif model_type == 'shufflenetv2':
+            base_model = shufflenet_v2_x1_0(pretrained=True, progress=True)
+        elif model_type == 'ghostnet':
+            base_model = ghostnet(pretrained=True, weights_path=None)
+        elif model_type == 'hbonet':
+            width_mult=0.5
+            base_model = hbonet(pretrained=True, width_mult=width_mult)
+        elif model_type == 'mobilevit_s':
+            base_model = mobilevit_s(pretrained=False)
+        elif model_type == 'mobilevit_xs':
+            base_model = mobilevit_xs(pretrained=False)
+        elif model_type == 'mobilevit_xxs':
+            base_model = mobilevit_xxs(pretrained=False)
+        elif model_type == 'resnet50':
+            base_model = resnet50(pretrained=True, progress=True)
+        else:
+            raise ValueError('Unsupported model type')
+
+        return base_model
+
+
+    def forward(self, x):
+        x = self.base_model(x)
+        x = F.softmax(x, dim=1)
+        return x
+
+
+
+def model_dump(model_type, model_input_shape, batch_size, output_path):
+    # get model
+    model = Classifier(model_type)
+    summary(model, input_size=(3,)+model_input_shape)
 
     os.makedirs(output_path, exist_ok=True)
 
@@ -67,7 +89,7 @@ def model_dump(model_type, model_input_shape, batch_size, output_path):
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description='Dump imagenet pretrained CNN classifier model and convert to onnx/torchscript')
     parser.add_argument('--model_type', type=str, required=False, default='csppeleenet',
         help='model type: mobilenetv3/v2/csppeleenet, default=%(default)s')
     parser.add_argument('--model_input_shape', type=str, required=False, default='224x224',

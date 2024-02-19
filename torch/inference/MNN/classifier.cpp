@@ -80,7 +80,7 @@ void display_usage() {
 
 
 //descend order sort for class prediction records
-bool compare_conf(std::pair<uint8_t, float> lpred, std::pair<uint8_t, float> rpred)
+bool compare_conf(std::pair<int, float> lpred, std::pair<int, float> rpred)
 {
     if (lpred.second < rpred.second)
         return false;
@@ -90,7 +90,7 @@ bool compare_conf(std::pair<uint8_t, float> lpred, std::pair<uint8_t, float> rpr
 
 
 // CNN Classifier postprocess
-void classifier_postprocess(const Tensor* score_tensor, std::vector<std::pair<uint8_t, float>> &class_results)
+void classifier_postprocess(const Tensor* score_tensor, std::vector<std::pair<int, float>> &class_results)
 {
     // 1. do following transform to get sorted class index & score:
     //
@@ -157,7 +157,7 @@ void classifier_postprocess(const Tensor* score_tensor, std::vector<std::pair<ui
         // class = np.argsort(pred, axis=-1)
         // class = class[::-1]
         //
-        uint8_t class_index = 0;
+        int class_index = 0;
         float max_score = 0.0;
         for (int i = 0; i < class_size; i++) {
             class_results.emplace_back(std::make_pair(i, bytes[i]));
@@ -415,7 +415,7 @@ void RunInference(Settings* s) {
     MNN_ASSERT(output_tensor->getType().bits == 32);
 
 
-    std::vector<std::pair<uint8_t, float>> class_results;
+    std::vector<std::pair<int, float>> class_results;
     // Do classifier_postprocess to get sorted class index & scores
     gettimeofday(&start_time, nullptr);
     classifier_postprocess(output_tensor.get(), class_results);

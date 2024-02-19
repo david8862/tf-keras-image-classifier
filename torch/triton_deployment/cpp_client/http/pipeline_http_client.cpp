@@ -1,8 +1,8 @@
 //
-//  classifier_grpc_client.cpp
-//  Triton gRPC client
+//  pipeline_http_client.cpp
+//  Triton HTTP client for classifier pipeline
 //
-//  Created by david8862 on 2024/01/23.
+//  Created by david8862 on 2024/02/18.
 //
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,14 +22,12 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include "grpc_client.h"
+#include "http_client.h"
+#include "json_utils.h"
+#include <rapidjson/error/en.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-#define STB_IMAGE_RESIZE_IMPLEMENTATION
-#include "stb_image_resize.h"
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
 
 namespace tc = triton::client;
 
@@ -39,11 +37,9 @@ struct Settings {
     int loop_count = 1;
     int number_of_warmup_runs = 2;
     int top_k = 1;
-    float input_mean = 127.5f;
-    float input_std = 127.5f;
     std::string server_addr = "localhost";
-    std::string server_port = "8001";
-    std::string model_name = "classifier_onnx";
+    std::string server_port = "8000";
+    std::string model_name = "classifier_pipeline";
     std::string input_img_name = "./dog.jpg";
     std::string classes_file_name = "./classes.txt";
     bool verbose = false;
@@ -55,44 +51,19 @@ double get_us(struct timeval t)
     return (t.tv_sec * 1000000 + t.tv_usec);
 }
 
-
-std::string grpc_data_type_str(int data_type)
+// Re-implement JSON parse with rapidjson, to avoid link error
+tc::Error
+ParseJson(rapidjson::Document* document, const std::string& json_str)
 {
-    switch(data_type)
-    {
-        case 0:
-            return "TYPE_INVALID";
-        case 1:
-            return "TYPE_BOOL";
-        case 2:
-            return "TYPE_UINT8";
-        case 3:
-            return "TYPE_UINT16";
-        case 4:
-            return "TYPE_UINT32";
-        case 5:
-            return "TYPE_UINT64";
-        case 6:
-            return "TYPE_INT8";
-        case 7:
-            return "TYPE_INT16";
-        case 8:
-            return "TYPE_INT32";
-        case 9:
-            return "TYPE_INT64";
-        case 10:
-            return "TYPE_FP16";
-        case 11:
-            return "TYPE_FP32";
-        case 12:
-            return "TYPE_FP64";
-        case 13:
-            return "TYPE_STRING";
-        case 14:
-            return "TYPE_BF16";
-        default:
-            return "TYPE_INVALID";
-    }
+  const unsigned int parseFlags = rapidjson::kParseNanAndInfFlag;
+  document->Parse<parseFlags>(json_str.c_str(), json_str.size());
+  if (document->HasParseError()) {
+    return tc::Error(
+        "failed to parse JSON at" + std::to_string(document->GetErrorOffset()) +
+        ": " + std::string(GetParseError_En(document->GetParseError())));
+  }
+
+  return tc::Error::Success;
 }
 
 
@@ -113,8 +84,8 @@ void classifier_postprocess(const float* score_data, std::vector<std::pair<int, 
     //    class = np.argsort(pred, axis=-1)
     //    class = class[::-1]
     //
-    int batch = shape[0];
-    int class_size = shape[1];
+    int batch = shape[1];
+    int class_size = shape[2];
 
     // Get sorted class index & score,
     // just as Python postprocess:
@@ -138,96 +109,41 @@ void classifier_postprocess(const float* score_data, std::vector<std::pair<int, 
 }
 
 
-// Resize image to model input shape
-uint8_t* image_resize(uint8_t* inputImage, int image_width, int image_height, int image_channel, int input_width, int input_height, int input_channel)
+int get_file_size(const char* filename)
 {
-    // assume the data channel match
-    assert(image_channel == input_channel);
+    FILE *fp = fopen(filename, "r");
+    if (!fp)
+        return -1;
 
-    uint8_t* input_image = (uint8_t*)malloc(input_height * input_width * input_channel * sizeof(uint8_t));
-    if (input_image == nullptr) {
-        std::cerr << "Can't alloc memory" << std::endl;
-        exit(-1);
-    }
-    stbir_resize_uint8(inputImage, image_width, image_height, 0,
-                     input_image, input_width, input_height, 0, image_channel);
+    fseek(fp, 0, SEEK_END);
 
-    return input_image;
+    int size = ftell(fp);
+    fclose(fp);
+
+    return size;
 }
 
 
-// Center crop image to model input shape
-uint8_t* image_crop(uint8_t* inputImage, int image_width, int image_height, int image_channel, int input_width, int input_height, int input_channel)
+void show_image_info(const char* image_file)
 {
-    // assume the data channel match
-    assert(image_channel == input_channel);
-
-    int x_offset = int((image_width - input_width) / 2);
-    int y_offset = int((image_height - input_height) / 2);
-
-    if (image_height < input_height || image_width < input_width) {
-        std::cerr << "fail to crop due to small input image" << std::endl;
-        exit(-1);
+    int image_width;
+    int image_height;
+    int image_channel = 3;
+    uint8_t* image_data = (uint8_t*)stbi_load(image_file, &image_width, &image_height, &image_channel, image_channel);
+    if (nullptr == image_data) {
+        std::cerr << "can't open " << image_file << std::endl;
+        return;
     }
+    std::cout << "origin image size: width:" << image_width
+              << ", height:" << image_height
+              << ", channel:" << image_channel
+              << "\n";
 
-    uint8_t* input_image = (uint8_t*)malloc(input_height * input_width * input_channel * sizeof(uint8_t));
-    if (input_image == nullptr) {
-        std::cerr << "Can't alloc memory" << std::endl;
-        exit(-1);
-    }
+    // free input image
+    stbi_image_free(image_data);
+    image_data = nullptr;
 
-    // Crop out src image into input image
-    for (int h = 0; h < input_height; h++) {
-        for (int w = 0; w < input_width; w++) {
-            for (int c = 0; c < input_channel; c++) {
-                input_image[h*input_width*input_channel + w*input_channel + c] = inputImage[(h+y_offset)*image_width*image_channel + (w+x_offset)*image_channel + c];
-            }
-        }
-    }
-
-    return input_image;
-}
-
-
-// Reorder image from channel last to channel first
-uint8_t* image_reorder(uint8_t* inputImage, int image_width, int image_height, int image_channel)
-{
-    uint8_t* reorder_image = (uint8_t*)malloc(image_height * image_width * image_channel * sizeof(uint8_t));
-    if (reorder_image == nullptr) {
-        std::cerr << "Can't alloc memory" << std::endl;
-        exit(-1);
-    }
-
-    // Reorder src image (channel last) into channel first image
-    for (int h = 0; h < image_height; h++) {
-        for (int w = 0; w < image_width; w++) {
-            for (int c = 0; c < image_channel; c++) {
-                int image_offset = h * image_width * image_channel + w * image_channel + c;
-                int reorder_offset = c * image_width * image_height + h * image_width + w;
-
-                reorder_image[reorder_offset] = inputImage[image_offset];
-            }
-        }
-    }
-
-    return reorder_image;
-}
-
-
-void fill_data(std::vector<float>& out, uint8_t* in, int input_width, int input_height,
-            int input_channels, Settings* s) {
-  auto output_number_of_pixels = input_height * input_width * input_channels;
-
-  for (int i = 0; i < output_number_of_pixels; i++) {
-      out[i] = (in[i] - s->input_mean) / s->input_std;
-
-    //if (s->input_floating)
-      //out[i] = (in[i] - s->input_mean) / s->input_std;
-    //else
-      //out[i] = (uint8_t)in[i];
-  }
-
-  return;
+    return;
 }
 
 
@@ -248,14 +164,14 @@ void RunInference(Settings* s)
     int num_classes = classes.size();
     std::cout << "num_classes: " << num_classes << "\n";
 
-    // create InferenceServerGrpcClient instance to communicate
-    // with triton server using gRPC protocol
-    std::unique_ptr<tc::InferenceServerGrpcClient> client;
+    // create InferenceServerHttpClient instance to communicate
+    // with triton server using HTTP protocol
+    std::unique_ptr<tc::InferenceServerHttpClient> client;
     tc::Error err;
 
-    err = tc::InferenceServerGrpcClient::Create(&client, server_url, s->verbose);
+    err = tc::InferenceServerHttpClient::Create(&client, server_url, s->verbose);
     if (!err.IsOk()) {
-        std::cerr << "unable to create grpc client: " << err << std::endl;
+        std::cerr << "unable to create http client: " << err << std::endl;
         exit(1);
     };
 
@@ -293,121 +209,181 @@ void RunInference(Settings* s)
         exit(1);
     }
 
-    // get model config
-    inference::ModelConfigResponse model_config;
-    err = client->ModelConfig(&model_config, s->model_name, model_version);
+    // get server metadata
+    std::string server_metadata;
+    err = client->ServerMetadata(&server_metadata);
     if (!err.IsOk()) {
-        std::cerr << "error: failed to get model config: " << err << std::endl;
+        std::cerr << "error: unable to get server metadata: " << err << std::endl;
+        exit(1);
+    }
+    rapidjson::Document server_metadata_json;
+    //err = tc::ParseJson(&server_metadata_json, server_metadata);
+    err = ParseJson(&server_metadata_json, server_metadata);
+    if (!err.IsOk()) {
+        std::cerr << "error: failed to parse server metadata: " << err << std::endl;
+        exit(1);
+    }
+    if (s->verbose) {
+        std::cout << "\nServer Metadata:\n" << server_metadata << std::endl;
     }
 
     // get model metadata, here
     // we will use metadata to parse model info
-    inference::ModelMetadataResponse model_metadata;
+    std::string model_metadata;
     err = client->ModelMetadata(&model_metadata, s->model_name, model_version);
     if (!err.IsOk()) {
-        std::cerr << "error: failed to get model metadata: " << err << std::endl;
+        std::cerr << "error: unable to get model metadata: " << err << std::endl;
+        exit(1);
+    }
+    rapidjson::Document model_metadata_json;
+    //err = tc::ParseJson(&model_metadata_json, model_metadata);
+    err = ParseJson(&model_metadata_json, model_metadata);
+    if (!err.IsOk()) {
+        std::cerr << "error: failed to parse model metadata: " << err << std::endl;
+        exit(1);
+    }
+    if (s->verbose) {
+        std::cout << "\nModel Metadata:\n" << model_metadata << std::endl;
+    }
+
+    // get model config
+    std::string model_config;
+    err = client->ModelConfig(&model_config, s->model_name, model_version);
+    if (!err.IsOk()) {
+        std::cerr << "error: unable to get model config: " << err << std::endl;
+        exit(1);
+    }
+    rapidjson::Document model_config_json;
+    //err = tc::ParseJson(&model_config_json, model_config);
+    err = ParseJson(&model_config_json, model_config);
+    if (!err.IsOk()) {
+        std::cerr << "error: unable to parse model config: " << err << std::endl;
+        exit(1);
+    }
+    if (s->verbose) {
+        std::cout << "\nModel Config:\n" << model_config << std::endl;
+    }
+
+    // check input/output num in metadata
+    const auto& input_itr = model_metadata_json.FindMember("inputs");
+    size_t input_count = 0;
+    if (input_itr != model_metadata_json.MemberEnd()) {
+        input_count = input_itr->value.Size();
+    }
+    if (input_count != 1) {
+        std::cerr << "expecting 1 input in model, got " << input_count
+                  << std::endl;
         exit(1);
     }
 
-    // check input/output num
-    if (model_metadata.inputs().size() != 1) {
-        std::cerr << "expecting 1 input in model metadata, got "
-            << model_metadata.inputs().size() << std::endl;
+    const auto& output_itr = model_metadata_json.FindMember("outputs");
+    size_t output_count = 0;
+    if (output_itr != model_metadata_json.MemberEnd()) {
+        output_count = output_itr->value.Size();
+    }
+    if (output_count != 1) {
+        std::cerr << "expecting 1 output in model, got " << output_count
+                  << std::endl;
         exit(1);
     }
-    if (model_metadata.outputs().size() != 1) {
-        std::cerr << "expecting 1 output in model metadata, got "
-            << model_metadata.outputs().size() << std::endl;
+
+#if 0
+    // check input/output num in config
+    const auto& input_config_itr = model_config_json.FindMember("input");
+    input_count = 0;
+    if (input_config_itr != model_config_json.MemberEnd()) {
+        input_count = input_config_itr->value.Size();
+    }
+    if (input_count != 1) {
+        std::cerr << "expecting 1 input in model configuration, got " << input_count
+                  << std::endl;
         exit(1);
     }
+
+    const auto& output_config_itr = model_config_json.FindMember("output");
+    output_count = 0;
+    if (output_config_itr != model_config_json.MemberEnd()) {
+        output_count = output_config_itr->value.Size();
+    }
+    if (output_count != 1) {
+        std::cerr << "expecting 1 output in model configuration, got " << output_count
+                  << std::endl;
+        exit(1);
+    }
+#endif
 
     // parse input metadata & config
-    auto input_metadata = model_metadata.inputs(0);
-    //auto input_config = model_config.config().input(0);
+    const auto& input_metadata = *input_itr->value.Begin();
+    //const auto& input_config = *input_config_itr->value.Begin();
 
-    std::string input_name = input_metadata.name();
-    std::string input_type = input_metadata.datatype();
-    //std::string input_name = input_config.name();
-    //std::string input_type = grpc_data_type_str(input_config.data_type());
-
-    // check input layout (NCHW/NHWC) and get shape
-    auto input_shape_size = input_metadata.shape().size();
-    assert(input_shape_size == 4);
-
-    std::string input_layout;
-    int input_batch, input_height, input_width, input_channel;
-    if (input_metadata.shape(1) == 3) {
-        // NCHW
-        input_layout = "NCHW";
-        input_batch = input_metadata.shape(0);
-        input_channel = input_metadata.shape(1);
-        input_height = input_metadata.shape(2);
-        input_width = input_metadata.shape(3);
-    } else {
-        // NHWC
-        input_layout = "NHWC";
-        input_batch = input_metadata.shape(0);
-        input_height = input_metadata.shape(1);
-        input_width = input_metadata.shape(2);
-        input_channel = input_metadata.shape(3);
+    const auto& input_name_itr = input_metadata.FindMember("name");
+    if (input_name_itr == input_metadata.MemberEnd()) {
+        std::cerr << "input missing name in the metadata for model'"
+                  << model_metadata_json["name"].GetString() << "'" << std::endl;
+        exit(1);
     }
+    std::string input_name = std::string(input_name_itr->value.GetString(), input_name_itr->value.GetStringLength());
+
+    const auto& input_dtype_itr = input_metadata.FindMember("datatype");
+    if (input_dtype_itr == input_metadata.MemberEnd()) {
+        std::cerr << "input missing datatype in the metadata for model'"
+                  << model_metadata_json["name"].GetString() << "'" << std::endl;
+        exit(1);
+    }
+    std::string input_type = std::string(input_dtype_itr->value.GetString(), input_dtype_itr->value.GetStringLength());
+
+
+    auto shape_str_fn = [](const std::vector<int64_t> &sizes, const uint32_t n_dims) {
+        std::stringstream ss;
+        ss << "(";
+
+        for (int i = 0; i < n_dims; i++) {
+            ss << sizes[i] << ",";
+        }
+        ss << ")";
+        return ss.str();
+    };
+
+    // check input shape
+    const auto& input_shape_itr = input_metadata.FindMember("shape");
+    if (input_shape_itr == input_metadata.MemberEnd()) {
+        std::cerr << "input missing shape in the metadata for model'"
+                  << model_metadata_json["name"].GetString() << "'" << std::endl;
+        exit(1);
+    }
+    size_t input_shape_size = input_shape_itr->value.Size();
+    assert(input_shape_size == 2);
+    std::vector<int64_t> input_shape{input_shape_itr->value[0].GetInt(),
+                                     input_shape_itr->value[1].GetInt()};
 
     std::cout << "input tensor info: "
               << "name " << input_name << ", "
               << "type " << input_type << ", "
-              << "shape_size " << input_shape_size << ", "
-              << "layout " << input_layout << ", "
-              << "batch " << input_batch << ", "
-              << "height " << input_height << ", "
-              << "width " << input_width << ", "
-              << "channels " << input_channel << "\n";
+              << "shape " << shape_str_fn(input_shape, input_shape_size) << "\n";
+    // assume input tensor type is UINT8
+    assert(input_type == "UINT8");
 
-    // assume input tensor type is fp32
-    assert(input_type == "FP32");
-    assert(input_batch == 1);
-    std::vector<int64_t> input_shape{input_metadata.shape(0),
-                                     input_metadata.shape(1),
-                                     input_metadata.shape(2),
-                                     input_metadata.shape(3)};
+    // show input image info
+    show_image_info(s->input_img_name.c_str());
 
-    // load input image
-    auto inputPath = s->input_img_name.c_str();
-    int image_width, image_height, image_channel;
-    uint8_t* inputImage = (uint8_t*)stbi_load(inputPath, &image_width, &image_height, &image_channel, input_channel);
-    if (nullptr == inputImage) {
-        std::cerr << "can't open " << inputPath << std::endl;
-        return;
-    }
-    std::cout << "origin image size: width:" << image_width
-              << ", height:" << image_height
-              << ", channel:" << image_channel
-              << "\n";
-
-    // crop input image
-    uint8_t* cropedImage = image_crop(inputImage, image_width, image_height, image_channel, input_width, input_height, input_channel);
-
-    // free input image
-    stbi_image_free(inputImage);
-    inputImage = nullptr;
-
-    uint8_t* targetImage = cropedImage;
-
-    if (input_layout == "NCHW") {
-        // convert image data from NHWC to NCHW
-        uint8_t* reorderImage = image_reorder(cropedImage, input_width, input_height, input_channel);
-        // free croped image
-        free(cropedImage);
-        cropedImage = nullptr;
-        targetImage = reorderImage;
+    // read image data in raw mode
+    int file_size = get_file_size(s->input_img_name.c_str());
+    if (file_size < 0) {
+        perror("failed to get file size of input image");
+        exit(1);
     }
 
-    // fill input data
-    int data_num = input_batch * input_height * input_width * input_channel;
-    std::vector<float> input_data(data_num);
-    fill_data(input_data, targetImage,
-              input_width, input_height, input_channel, s);
+    uint8_t* input_image = (uint8_t*)malloc(file_size);
+    FILE* image_file = fopen(s->input_img_name.c_str(), "rb");
+    int ret = fread(input_image, 1, file_size, image_file);
+    fclose(image_file);
 
-    // Initialize the inputs with the data.
+    // update input_shape with image data size
+    input_shape[0] = 1;
+    input_shape[1] = file_size;
+
+
+    // Initialize the inputs with image data.
     tc::InferInput* image_input;
     err = tc::InferInput::Create(&image_input, input_name, input_shape, input_type);
     if (!err.IsOk()) {
@@ -416,45 +392,63 @@ void RunInference(Settings* s)
     }
     std::shared_ptr<tc::InferInput> image_input_ptr(image_input);
 
-    err = image_input_ptr->AppendRaw(reinterpret_cast<uint8_t*>(&input_data[0]), input_data.size()*sizeof(float));
+    err = image_input_ptr->AppendRaw(input_image, file_size);
     if (!err.IsOk()) {
         std::cerr << "error: unable to set data for " + input_name + ": " << err << std::endl;
         exit(1);
     }
 
     // parse output metadata & config
-    auto output_metadata = model_metadata.outputs(0);
-    //auto output_config = model_config.config().output(0);
+    const auto& output_metadata = *output_itr->value.Begin();
+    //const auto& output_config = *output_config_itr->value.Begin();
 
-    std::string output_name = output_metadata.name();
-    std::string output_type = output_metadata.datatype();
-    //std::string output_name = output_config.name();
-    //std::string output_type = grpc_data_type_str(output_config.data_type());
+    const auto& output_name_itr = output_metadata.FindMember("name");
+    if (output_name_itr == output_metadata.MemberEnd()) {
+        std::cerr << "output missing name in the metadata for model'"
+                  << model_metadata_json["name"].GetString() << "'" << std::endl;
+        exit(1);
+    }
+    std::string output_name = std::string(output_name_itr->value.GetString(), output_name_itr->value.GetStringLength());
 
-    // get output tensor info, assume only 1 output tensor (scores)
-    // image_input: 1 x 3 x 224 x 224
-    // "scores": 1 x num_classes
-    auto output_shape_size = output_metadata.shape().size();
-    assert(output_shape_size == 2);
+    const auto& output_dtype_itr = output_metadata.FindMember("datatype");
+    if (output_dtype_itr == output_metadata.MemberEnd()) {
+        std::cerr << "output missing datatype in the metadata for model'"
+                  << model_metadata_json["name"].GetString() << "'" << std::endl;
+        exit(1);
+    }
+    std::string output_type = std::string(output_dtype_itr->value.GetString(), output_dtype_itr->value.GetStringLength());
 
-    int output_batch = output_metadata.shape(0);
-    int output_classes = output_metadata.shape(1);
+    // get output tensor info, assume only 1 output tensor
+    // "input": -1 x -1
+    // "output": -1 x 1 x num_classes
+    const auto& output_shape_itr = output_metadata.FindMember("shape");
+    if (output_shape_itr == output_metadata.MemberEnd()) {
+        std::cerr << "output missing shape in the metadata for model'"
+                  << model_metadata_json["name"].GetString() << "'" << std::endl;
+        exit(1);
+    }
+    size_t output_shape_size = output_shape_itr->value.Size();
+    assert(output_shape_size == 3);
+    std::vector<int64_t> output_shape{output_shape_itr->value[0].GetInt(),
+                                     output_shape_itr->value[1].GetInt(),
+                                     output_shape_itr->value[2].GetInt()};
+    int output_batch = output_shape_itr->value[1].GetInt();
+    int output_classes = output_shape_itr->value[2].GetInt();
 
     std::cout << "output tensor info: "
               << "name " << output_name << ", "
               << "type " << output_type << ", "
-              << "shape_size " << output_shape_size << ", "
+              << "shape " << shape_str_fn(output_shape, output_shape_size) << ", "
               << "batch " << output_batch << ", "
               << "classes " << output_classes << "\n";
 
     // check if predict class number matches label file
     assert(num_classes == output_classes);
 
+
     // assume output tensor type is fp32
     assert(output_type == "FP32");
     assert(output_batch == 1);
-    std::vector<int64_t> output_shape{output_batch, output_classes};
-
 
     // generate the outputs to be requested.
     tc::InferRequestedOutput* score_output;
@@ -500,6 +494,7 @@ void RunInference(Settings* s)
     std::shared_ptr<tc::InferResult> results_ptr(results);
     std::cout << "model invoke average time: " << (get_us(stop_time) - get_us(start_time)) / (1000 * s->loop_count) << "ms\n";
 
+
     // validate result shape
     std::vector<int64_t> result_shape;
     err = results_ptr->Shape(output_name, &result_shape);
@@ -507,7 +502,7 @@ void RunInference(Settings* s)
         std::cerr << "unable to get shape for '" + output_name + "'" << std::endl;
         exit(1);
     }
-    if ((result_shape.size() != 2) || (result_shape[0] != 1) || (result_shape[1] != num_classes)) {
+    if ((result_shape.size() != 3) || (result_shape[1] != 1) || (result_shape[2] != num_classes)) {
         std::cerr << "error: received incorrect shapes for '" << output_name << "'"
                   << std::endl;
         exit(1);
@@ -558,9 +553,9 @@ void RunInference(Settings* s)
     }
 
     // Release buffer memory
-    if (targetImage) {
-        free(targetImage);
-        targetImage = nullptr;
+    if (input_image) {
+        free(input_image);
+        input_image = nullptr;
     }
 
     if (s->verbose) {
@@ -580,10 +575,10 @@ void RunInference(Settings* s)
         std::cout << "cumulative_receive_time_ns "
             << infer_stat.cumulative_receive_time_ns << std::endl;
 
-        inference::ModelStatisticsResponse model_stat;
+        std::string model_stat;
         client->ModelInferenceStatistics(&model_stat, s->model_name);
         std::cout << "======Model Statistics======" << std::endl;
-        std::cout << model_stat.DebugString() << std::endl;
+        std::cout << model_stat << std::endl;
     }
 
     return;
@@ -592,15 +587,13 @@ void RunInference(Settings* s)
 
 void display_usage() {
     std::cout
-        << "Usage: classifier_grpc_client\n"
+        << "Usage: pipeline_http_client\n"
         << "--server_addr, -a: localhost\n"
-        << "--server_port, -p: 8001\n"
-        << "--model_name, -m: classifier_onnx\n"
+        << "--server_port, -p: 8000\n"
+        << "--model_name, -m: classifier_pipeline\n"
         << "--image, -i: image_name.jpg\n"
         << "--classes, -l: classes labels for the model\n"
         << "--top_k, -k: show top k classes result\n"
-        << "--input_mean, -b: input mean\n"
-        << "--input_std, -s: input standard deviation\n"
         << "--count, -c: loop model run for certain times\n"
         << "--warmup_runs, -w: number of warmup runs\n"
         << "--verbose, -v: [0|1] print more information\n"
@@ -621,8 +614,6 @@ int main(int argc, char** argv) {
         {"image", required_argument, nullptr, 'i'},
         {"classes", required_argument, nullptr, 'l'},
         {"top_k", required_argument, nullptr, 'k'},
-        {"input_mean", required_argument, nullptr, 'b'},
-        {"input_std", required_argument, nullptr, 's'},
         {"count", required_argument, nullptr, 'c'},
         {"warmup_runs", required_argument, nullptr, 'w'},
         {"verbose", required_argument, nullptr, 'v'},
@@ -633,7 +624,7 @@ int main(int argc, char** argv) {
     int option_index = 0;
 
     c = getopt_long(argc, argv,
-                    "a:b:c:hi:k:l:m:p:s:v:w:", long_options,
+                    "a:c:hi:k:l:m:p:v:w:", long_options,
                     &option_index);
 
     /* Detect the end of the options. */
@@ -642,9 +633,6 @@ int main(int argc, char** argv) {
     switch (c) {
       case 'a':
         s.server_addr = optarg;
-        break;
-      case 'b':
-        s.input_mean = strtod(optarg, nullptr);
         break;
       case 'c':
         s.loop_count =
@@ -666,9 +654,6 @@ int main(int argc, char** argv) {
       case 'p':
         s.server_port = optarg;
         break;
-      case 's':
-        s.input_std = strtod(optarg, nullptr);
-        break;
       case 'w':
         s.number_of_warmup_runs =
             strtol(optarg, nullptr, 10);  // NOLINT(runtime/deprecated_fn)
@@ -688,3 +673,4 @@ int main(int argc, char** argv) {
   RunInference(&s);
   return 0;
 }
+
