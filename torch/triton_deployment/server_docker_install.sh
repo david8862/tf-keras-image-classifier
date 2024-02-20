@@ -19,7 +19,7 @@ MODEL_REPO_PATH=$1
 # clone triton inference server repo
 git clone -b r23.12 https://github.com/triton-inference-server/server.git
 
-# download demon models
+# download demo models
 pushd server/docs/examples
 ./fetch_models.sh
 popd

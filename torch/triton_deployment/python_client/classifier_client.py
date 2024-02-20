@@ -11,13 +11,12 @@ import os, sys, argparse
 import time
 import glob
 import numpy as np
-import torch
 from PIL import Image
 import cv2
 import tritonclient.http as httpclient
 import tritonclient.grpc as grpcclient
 
-sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
 from common.data_utils import preprocess_image
 from common.utils import get_classes
 

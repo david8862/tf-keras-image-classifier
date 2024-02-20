@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Triton http/grpc client for classifier preprocess model
+Triton http/grpc client for classifier pipeline
 """
 import os, sys, argparse
 import time
 import glob
 import numpy as np
-import torch
 from PIL import Image
 import cv2
 import tritonclient.http as httpclient
 import tritonclient.grpc as grpcclient
 
-sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
-from common.data_utils import denormalize_image
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
+from common.utils import get_classes
 
 
-def classifier_preprocess_http_client(server_addr, server_port, model_name, image_files, output_path):
+def classifier_pipeline_http_client(server_addr, server_port, model_name, image_files, class_names, output_path):
     # init triton http client
     server_url = server_addr + ':' + server_port
     triton_client = httpclient.InferenceServerClient(url=server_url, verbose=False, ssl=False, ssl_options={}, insecure=False, ssl_context_factory=None)
@@ -46,17 +45,11 @@ def classifier_preprocess_http_client(server_addr, server_port, model_name, imag
     assert input_type == 'UINT8', 'invalid input type.'
     assert output_type == 'FP32', 'invalid output type.'
 
-    assert len(outputs_metadata[0]['shape']) == 4, 'invalid output shape.'
-
-    # check if output layout is NHWC or NCHW
-    if outputs_metadata[0]['shape'][1] == 3:
-        print("NCHW output layout")
-        output_layout = "NCHW"
-        batch, channel, height, width = outputs_metadata[0]['shape']  #NCHW
-    else:
-        print("NHWC output layout")
-        output_layout = "NHWC"
-        batch, height, width, channel = outputs_metadata[0]['shape']  #NHWC
+    assert len(outputs_metadata[0]['shape']) == 3, 'invalid output shape.' # (-1, 1, num_classes)
+    num_classes = outputs_metadata[0]['shape'][-1]
+    if class_names:
+        # check if classes number match with model prediction
+        assert num_classes == len(class_names), 'classes number mismatch with model.'
 
     # loop the sample list to predict on each image
     for image_file in image_files:
@@ -72,21 +65,21 @@ def classifier_preprocess_http_client(server_addr, server_port, model_name, imag
         outputs = []
         outputs.append(httpclient.InferRequestedOutput(output_name, binary_data=False))
 
-        # do inference to get preprocess result
+        # do inference to get prediction
         start = time.time()
         prediction = triton_client.infer(model_name, inputs=inputs, outputs=outputs)
         end = time.time()
         print("Inference time: {:.8f}ms".format((end - start) * 1000))
 
         result = prediction.as_numpy(output_name)
-        handle_prediction(result[0], output_layout, image_file, output_path)
+        handle_prediction(result[0], image_file, class_names, output_path)
 
     # close triton http client
     triton_client.close()
 
 
 
-def classifier_preprocess_grpc_client(server_addr, server_port, model_name, image_files, output_path):
+def classifier_pipeline_grpc_client(server_addr, server_port, model_name, image_files, class_names, output_path):
     # init triton grpc client
     server_url = server_addr + ':' + server_port
     triton_client = grpcclient.InferenceServerClient(url=server_url, verbose=False, ssl=False)
@@ -115,17 +108,11 @@ def classifier_preprocess_grpc_client(server_addr, server_port, model_name, imag
     assert input_type == 'UINT8', 'invalid input type.'
     assert output_type == 'FP32', 'invalid output type.'
 
-    assert len(outputs_metadata[0].shape) == 4, 'invalid output shape.'
-
-    # check if input layout is NHWC or NCHW
-    if outputs_metadata[0].shape[1] == 3:
-        print("NCHW output layout")
-        output_layout = "NCHW"
-        batch, channel, height, width = outputs_metadata[0].shape  #NCHW
-    else:
-        print("NHWC output layout")
-        output_layout = "NHWC"
-        batch, height, width, channel = outputs_metadata[0].shape  #NHWC
+    assert len(outputs_metadata[0].shape) == 3, 'invalid output shape.' # (-1, 1, num_classes)
+    num_classes = outputs_metadata[0].shape[-1]
+    if class_names:
+        # check if classes number match with model prediction
+        assert num_classes == len(class_names), 'classes number mismatch with model.'
 
     # loop the sample list to predict on each image
     for image_file in image_files:
@@ -141,31 +128,40 @@ def classifier_preprocess_grpc_client(server_addr, server_port, model_name, imag
         outputs = []
         outputs.append(grpcclient.InferRequestedOutput(output_name))
 
-        # do inference to get preprocess result
+        # do inference to get prediction
         start = time.time()
         prediction = triton_client.infer(model_name, inputs=inputs, outputs=outputs)
         end = time.time()
         print("Inference time: {:.8f}ms".format((end - start) * 1000))
 
         result = prediction.as_numpy(output_name)
-        handle_prediction(result[0], output_layout, image_file, output_path)
+        handle_prediction(result[0], image_file, class_names, output_path)
 
     # close triton grpc client
     triton_client.close()
 
 
 
-def handle_prediction(image_data, layout, image_file, output_path):
-    # convert image data to channel last
-    if layout == "NCHW":
-        image_data = np.transpose(image_data, (1, 2, 0))
+def handle_prediction(prediction, image_file, class_names, output_path):
+    indexes = np.argsort(prediction[0])
+    indexes = indexes[::-1]
+    #only pick top-1 class index
+    index = indexes[0]
+    score = prediction[0][index]
 
-    # here we denormalize the preprocessed data back
-    # to image, to check if the preprocess model
-    # works correct
-    image = denormalize_image(image_data)
+    result = '{name}:{conf:.3f}'.format(name=class_names[index] if class_names else index, conf=float(score))
+    print('Class result\n', result)
 
-    # save or show image
+    image = np.array(Image.open(image_file).convert('RGB'))
+    cv2.putText(image, result,
+                (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                fontScale=1,
+                color=(255, 0, 0),
+                thickness=1,
+                lineType=cv2.LINE_AA)
+
+    # save or show result
     if output_path:
         os.makedirs(output_path, exist_ok=True)
         output_file = os.path.join(output_path, os.path.basename(image_file))
@@ -177,21 +173,27 @@ def handle_prediction(image_data, layout, image_file, output_path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='classifier preprocess http/grpc client for triton inference server')
+    parser = argparse.ArgumentParser(description='classifier pipeline http/grpc client for triton inference server')
     parser.add_argument('--server_addr', type=str, required=False, default='localhost',
         help='triton server address, default=%(default)s')
     parser.add_argument('--server_port', type=str, required=False, default='8000',
         help='triton server port (8000 for http & 8001 for grpc), default=%(default)s')
-    parser.add_argument('--model_name', type=str, required=False, default='classifier_preprocess',
+    parser.add_argument('--model_name', type=str, required=False, default='classifier_pipeline',
         help='model name for inference, default=%(default)s')
     parser.add_argument('--image_path', type=str, required=True,
         help="image file or directory to inference")
+    parser.add_argument('--classes_path', type=str, required=False, default=None,
+        help='path to class name definitions')
     parser.add_argument('--output_path', type=str, required=False, default=None,
         help='output path to save dumped model, default=%(default)s')
     parser.add_argument('--protocol', type=str, required=False, default='http', choices=['http', 'grpc'],
         help="comm protocol between triton server & client (http/grpc), default=%(default)s")
 
     args = parser.parse_args()
+
+    class_names = None
+    if args.classes_path:
+        class_names = get_classes(args.classes_path)
 
     # get image file list or single image
     if os.path.isdir(args.image_path):
@@ -201,9 +203,9 @@ def main():
         image_files = [args.image_path]
 
     if args.protocol == 'http':
-        classifier_preprocess_http_client(args.server_addr, args.server_port, args.model_name, image_files, args.output_path)
+        classifier_pipeline_http_client(args.server_addr, args.server_port, args.model_name, image_files, class_names, args.output_path)
     elif args.protocol == 'grpc':
-        classifier_preprocess_grpc_client(args.server_addr, args.server_port, args.model_name, image_files, args.output_path)
+        classifier_pipeline_grpc_client(args.server_addr, args.server_port, args.model_name, image_files, class_names, args.output_path)
     else:
         raise ValueError('invalid protocol: ' + args.protocol)
 

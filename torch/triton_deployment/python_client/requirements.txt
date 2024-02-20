@@ -1,0 +1,8 @@
+pillow
+opencv-python
+opencv-python
+opencv-contrib-python
+torch
+torchvision
+torchsummary
+tritonclient[all]
