@@ -9,9 +9,12 @@ import torch
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
 
 
-def model_export(model_path, model_input_shape, output_path, batch_size=1):
+def model_export(model_path, model_input_shape, output_path, batch_size):
     # Input
-    img = torch.zeros((batch_size, 3, *model_input_shape))
+    if batch_size == -1:
+        img = torch.zeros((1, 3, *model_input_shape))
+    else:
+        img = torch.zeros((batch_size, 3, *model_input_shape))
 
     # Load PyTorch model
     model = torch.load(model_path, map_location=torch.device('cpu')).float()
@@ -41,8 +44,14 @@ def model_export(model_path, model_input_shape, output_path, batch_size=1):
         print('\nStarting ONNX export with onnx %s...' % onnx.__version__)
         export_file = os.path.join(output_path, model_basename+'.onnx')
 
-        torch.onnx.export(model, img, export_file, verbose=False, opset_version=12, input_names=['image_input'],
-                          output_names=['scores'])
+        if batch_size == -1:
+            # dump dynamic batch-size onnx model
+            torch.onnx.export(model, img, export_file, verbose=False, opset_version=12, input_names=['image_input'], output_names=['scores'],
+                              dynamic_axes={"image_input": {0: "batch_size"}, "scores": {0: "batch_size"}})
+
+        else:
+            # dump fix batch-size onnx model
+            torch.onnx.export(model, img, export_file, verbose=False, opset_version=12, input_names=['image_input'], output_names=['scores'])
 
         # Checks
         onnx_model = onnx.load(export_file)  # load onnx model
@@ -74,13 +83,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_path', type=str, required=True, help='model file to export')
     parser.add_argument('--model_input_shape', type=str, required=False, help='model input image shape as <height>x<width>, default=%(default)s', default='224x224')
+    parser.add_argument('--batch_size', type=int, required=False, help="batch size for inference, default=%(default)s", default=-1)
     parser.add_argument('--output_path', type=str, required=True, help='output path for exported model')
 
     args = parser.parse_args()
     height, width = args.model_input_shape.split('x')
     args.model_input_shape = (int(height), int(width))
 
-    model_export(args.model_path, args.model_input_shape, args.output_path, batch_size=1)
+    model_export(args.model_path, args.model_input_shape, args.output_path, args.batch_size)
 
 
 if __name__ == "__main__":

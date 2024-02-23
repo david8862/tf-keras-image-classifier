@@ -84,8 +84,8 @@ void classifier_postprocess(const float* score_data, std::vector<std::pair<int, 
     //    class = np.argsort(pred, axis=-1)
     //    class = class[::-1]
     //
-    int batch = shape[1];
-    int class_size = shape[2];
+    int batch = shape[0];
+    int class_size = shape[1];
 
     // Get sorted class index & score,
     // just as Python postprocess:
@@ -419,8 +419,8 @@ void RunInference(Settings* s)
     std::string output_type = std::string(output_dtype_itr->value.GetString(), output_dtype_itr->value.GetStringLength());
 
     // get output tensor info, assume only 1 output tensor
-    // "input": -1 x -1
-    // "output": -1 x 1 x num_classes
+    // "input": batch_size x -1
+    // "output": batch_size x num_classes
     const auto& output_shape_itr = output_metadata.FindMember("shape");
     if (output_shape_itr == output_metadata.MemberEnd()) {
         std::cerr << "output missing shape in the metadata for model'"
@@ -428,12 +428,11 @@ void RunInference(Settings* s)
         exit(1);
     }
     size_t output_shape_size = output_shape_itr->value.Size();
-    assert(output_shape_size == 3);
+    assert(output_shape_size == 2);
     std::vector<int64_t> output_shape{output_shape_itr->value[0].GetInt(),
-                                     output_shape_itr->value[1].GetInt(),
-                                     output_shape_itr->value[2].GetInt()};
-    int output_batch = output_shape_itr->value[1].GetInt();
-    int output_classes = output_shape_itr->value[2].GetInt();
+                                      output_shape_itr->value[1].GetInt()};
+    int output_batch = output_shape_itr->value[0].GetInt();
+    int output_classes = output_shape_itr->value[1].GetInt();
 
     std::cout << "output tensor info: "
               << "name " << output_name << ", "
@@ -448,7 +447,7 @@ void RunInference(Settings* s)
 
     // assume output tensor type is fp32
     assert(output_type == "FP32");
-    assert(output_batch == 1);
+    assert(output_batch == -1);
 
     // generate the outputs to be requested.
     tc::InferRequestedOutput* score_output;
@@ -502,7 +501,7 @@ void RunInference(Settings* s)
         std::cerr << "unable to get shape for '" + output_name + "'" << std::endl;
         exit(1);
     }
-    if ((result_shape.size() != 3) || (result_shape[1] != 1) || (result_shape[2] != num_classes)) {
+    if ((result_shape.size() != 2) || (result_shape[0] != 1) || (result_shape[1] != num_classes)) {
         std::cerr << "error: received incorrect shapes for '" << output_name << "'"
                   << std::endl;
         exit(1);

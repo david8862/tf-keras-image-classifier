@@ -45,7 +45,7 @@ def classifier_pipeline_http_client(server_addr, server_port, model_name, image_
     assert input_type == 'UINT8', 'invalid input type.'
     assert output_type == 'FP32', 'invalid output type.'
 
-    assert len(outputs_metadata[0]['shape']) == 3, 'invalid output shape.' # (-1, 1, num_classes)
+    assert len(outputs_metadata[0]['shape']) == 2, 'invalid output shape.' # (-1, num_classes)
     num_classes = outputs_metadata[0]['shape'][-1]
     if class_names:
         # check if classes number match with model prediction
@@ -72,7 +72,7 @@ def classifier_pipeline_http_client(server_addr, server_port, model_name, image_
         print("Inference time: {:.8f}ms".format((end - start) * 1000))
 
         result = prediction.as_numpy(output_name)
-        handle_prediction(result[0], image_file, class_names, output_path)
+        handle_prediction(result, image_file, class_names, output_path)
 
     # close triton http client
     triton_client.close()
@@ -108,7 +108,7 @@ def classifier_pipeline_grpc_client(server_addr, server_port, model_name, image_
     assert input_type == 'UINT8', 'invalid input type.'
     assert output_type == 'FP32', 'invalid output type.'
 
-    assert len(outputs_metadata[0].shape) == 3, 'invalid output shape.' # (-1, 1, num_classes)
+    assert len(outputs_metadata[0].shape) == 2, 'invalid output shape.' # (-1, num_classes)
     num_classes = outputs_metadata[0].shape[-1]
     if class_names:
         # check if classes number match with model prediction
@@ -135,7 +135,7 @@ def classifier_pipeline_grpc_client(server_addr, server_port, model_name, image_
         print("Inference time: {:.8f}ms".format((end - start) * 1000))
 
         result = prediction.as_numpy(output_name)
-        handle_prediction(result[0], image_file, class_names, output_path)
+        handle_prediction(result, image_file, class_names, output_path)
 
     # close triton grpc client
     triton_client.close()

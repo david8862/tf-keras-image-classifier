@@ -364,8 +364,9 @@ void RunInference(Settings* s)
 
     // assume input tensor type is fp32
     assert(input_type == "FP32");
-    assert(input_batch == 1);
-    std::vector<int64_t> input_shape{input_metadata.shape(0),
+    assert(input_batch == -1);
+    input_batch = 1;
+    std::vector<int64_t> input_shape{input_batch,
                                      input_metadata.shape(1),
                                      input_metadata.shape(2),
                                      input_metadata.shape(3)};
@@ -432,8 +433,8 @@ void RunInference(Settings* s)
     //std::string output_type = grpc_data_type_str(output_config.data_type());
 
     // get output tensor info, assume only 1 output tensor (scores)
-    // image_input: 1 x 3 x 224 x 224
-    // "scores": 1 x num_classes
+    // "image_input": batch_size x 3 x 224 x 224
+    // "scores": batch_size x num_classes
     auto output_shape_size = output_metadata.shape().size();
     assert(output_shape_size == 2);
 
@@ -452,7 +453,10 @@ void RunInference(Settings* s)
 
     // assume output tensor type is fp32
     assert(output_type == "FP32");
-    assert(output_batch == 1);
+    assert(output_batch == -1);
+
+    // set batch size to 1 for output shape
+    output_batch = 1;
     std::vector<int64_t> output_shape{output_batch, output_classes};
 
 

@@ -22,6 +22,11 @@ instance_group [
   }
 ]
 version_policy: { all {} }
+
+#model_transaction_policy {
+  #decoupled: false
+#}
+
 dynamic_batching {
   #preferred_batch_size: [ 4, 8 ]
   max_queue_delay_microseconds: 100

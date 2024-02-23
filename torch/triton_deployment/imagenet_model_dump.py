@@ -74,11 +74,18 @@ def model_dump(model_type, model_input_shape, batch_size, output_path):
 
     os.makedirs(output_path, exist_ok=True)
 
-    input_tensor = torch.randn((batch_size, 3, *model_input_shape))
+    if batch_size == -1:
+        input_tensor = torch.randn((1, 3, *model_input_shape))
 
-    # dump onnx model
-    torch.onnx.export(model, input_tensor, os.path.join(output_path, 'model.onnx'), verbose=False, opset_version=12, input_names=['image_input'], output_names=['scores'])
-                      # dynamic_axes={"image_input": {0: "batch_size"}, "scores": {0: "batch_size"}})
+        # dump dynamic batch-size onnx model
+        torch.onnx.export(model, input_tensor, os.path.join(output_path, 'model.onnx'), verbose=False, opset_version=12, input_names=['image_input'], output_names=['scores'],
+                          dynamic_axes={"image_input": {0: "batch_size"}, "scores": {0: "batch_size"}})
+    else:
+        input_tensor = torch.randn((batch_size, 3, *model_input_shape))
+
+        # dump fix batch-size onnx model
+        torch.onnx.export(model, input_tensor, os.path.join(output_path, 'model.onnx'), verbose=False, opset_version=12, input_names=['image_input'], output_names=['scores'])
+
 
     # dump torchscript model
     torchscript_model = torch.jit.trace(model, input_tensor)
@@ -94,7 +101,7 @@ def main():
         help='model type: mobilenetv3/v2/csppeleenet, default=%(default)s')
     parser.add_argument('--model_input_shape', type=str, required=False, default='224x224',
         help="model image input shape as <height>x<width>, default=%(default)s")
-    parser.add_argument('--batch_size', type=int, required=False, default=1,
+    parser.add_argument('--batch_size', type=int, required=False, default=-1,
         help="batch size for inference, default=%(default)s")
     parser.add_argument('--output_path', type=str, required=False, default=os.path.join('model_repository', 'classifier_onnx', '1'),
         help='output path to save dumped model, default=%(default)s')

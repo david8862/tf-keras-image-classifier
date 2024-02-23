@@ -81,35 +81,39 @@ class TritonPythonModel:
         # Every Python backend must iterate over everyone of the requests
         # and create a pb_utils.InferenceResponse for each of them.
         for request in requests:
-            # get input tensor
-            input_tensor = pb_utils.get_input_tensor_by_name(request, self.input_config[0]["name"])
+            if request.is_cancelled():
+                responses.append(pb_utils.InferenceResponse(
+                    error=pb_utils.TritonError("Req Cancelled", pb_utils.TritonError.CANCELLED)))
+            else:
+                # get input tensor
+                input_tensor = pb_utils.get_input_tensor_by_name(request, self.input_config[0]["name"])
 
-            # process input image
-            img = input_tensor.as_numpy()
-            image = Image.open(io.BytesIO(img.tobytes()))
-            resized_image = image.resize(self.output_shape[::-1], Image.BICUBIC)
-            image_data = np.asarray(resized_image).astype(np.float32)
-            image_data = image_data / 127.5 - 1
+                # process input image
+                img = input_tensor.as_numpy()
+                image = Image.open(io.BytesIO(img.tobytes()))
+                resized_image = image.resize(self.output_shape[::-1], Image.BICUBIC)
+                image_data = np.asarray(resized_image).astype(np.float32)
+                image_data = image_data / 127.5 - 1
 
-            if self.output_layout == "NCHW":
-                # convert image data to channel first
-                image_data = np.transpose(image_data, (2, 0, 1))
-            image_out = np.expand_dims(image_data, axis=0)
+                if self.output_layout == "NCHW":
+                    # convert image data to channel first
+                    image_data = np.transpose(image_data, (2, 0, 1))
+                image_out = np.expand_dims(image_data, axis=0)
 
-            # create input tensor
-            output_tensor = pb_utils.Tensor(self.output_config[0]["name"], image_out.astype(output_dtype))
+                # create input tensor
+                output_tensor = pb_utils.Tensor(self.output_config[0]["name"], image_out.astype(output_dtype))
 
-            # Create InferenceResponse. You can set an error here in case
-            # there was a problem with handling this inference request.
-            # Below is an example of how you can set errors in inference
-            # response:
-            #
-            # pb_utils.InferenceResponse(
-            #    output_tensors=..., TritonError("An error occurred"))
-            inference_response = pb_utils.InferenceResponse(
-                output_tensors=[output_tensor]
-            )
-            responses.append(inference_response)
+                # Create InferenceResponse. You can set an error here in case
+                # there was a problem with handling this inference request.
+                # Below is an example of how you can set errors in inference
+                # response:
+                #
+                # pb_utils.InferenceResponse(
+                #    output_tensors=..., TritonError("An error occurred"))
+                inference_response = pb_utils.InferenceResponse(
+                    output_tensors=[output_tensor]
+                )
+                responses.append(inference_response)
 
         # You should return a list of pb_utils.InferenceResponse. Length
         # of this list must match the length of `requests` list.
