@@ -458,9 +458,17 @@ void RunInference(Settings* s)
     }
     std::shared_ptr<tc::InferRequestedOutput> score_output_ptr(score_output);
 
-    // inference settings
+    // inference settings involving more inference
+    // control for service, like sequence info, etc.
     tc::InferOptions options(s->model_name);
     options.model_version_ = model_version;
+    options.request_id_ = "1";
+    options.sequence_id_ = 0;
+    options.sequence_id_str_ = "";
+    options.sequence_start_ = false;
+    options.sequence_end_ = false;
+    options.priority_ = false;
+    options.server_timeout_ = 0;
     options.client_timeout_ = 0;
 
     // prepare inference inputs/outputs/results

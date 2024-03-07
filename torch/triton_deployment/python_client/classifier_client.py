@@ -86,7 +86,7 @@ def classifier_http_client(server_addr, server_port, model_name, image_files, cl
 
         # do inference to get prediction
         start = time.time()
-        prediction = triton_client.infer(model_name, inputs=inputs, outputs=outputs)
+        prediction = triton_client.infer(model_name, inputs=inputs, outputs=outputs, request_id=str(1), sequence_id=0, sequence_start=False, sequence_end=False, priority=0, timeout=None)
         end = time.time()
         print("Inference time: {:.8f}ms".format((end - start) * 1000))
 
@@ -198,7 +198,7 @@ def classifier_grpc_client(server_addr, server_port, model_name, image_files, cl
 
         # do inference to get prediction
         start = time.time()
-        prediction = triton_client.infer(model_name, inputs=inputs, outputs=outputs)
+        prediction = triton_client.infer(model_name, inputs=inputs, outputs=outputs, request_id=str(1), sequence_id=0, sequence_start=False, sequence_end=False, priority=0, timeout=None)
         end = time.time()
         print("Inference time: {:.8f}ms".format((end - start) * 1000))
 

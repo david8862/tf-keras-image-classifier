@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Triton http/grpc client for classifier pipeline
+Triton http/grpc client for classifier pipeline with synchronous bls wrapper
 """
 import os, sys, argparse
 import time
@@ -11,12 +11,13 @@ from PIL import Image
 import cv2
 import tritonclient.http as httpclient
 import tritonclient.grpc as grpcclient
+from tritonclient.utils import *
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..'))
 from common.utils import get_classes
 
 
-def classifier_pipeline_http_client(server_addr, server_port, model_name, image_files, class_names, output_path):
+def pipeline_bls_sync_http_client(server_addr, server_port, model_name, target_model_name, target_input_name, target_output_name, image_files, class_names, output_path):
     # init triton http client
     server_url = server_addr + ':' + server_port
     triton_client = httpclient.InferenceServerClient(url=server_url, verbose=False, ssl=False, ssl_options={}, insecure=False, ssl_context_factory=None)
@@ -33,11 +34,15 @@ def classifier_pipeline_http_client(server_addr, server_port, model_name, image_
     inputs_metadata = model_metadata['inputs']
     outputs_metadata = model_metadata['outputs']
 
-    assert len(inputs_metadata) == 1, 'invalid input number.'
+    assert len(inputs_metadata) == 4, 'invalid input number.'
     assert len(outputs_metadata) == 1, 'invalid output number.'
 
-    input_name = inputs_metadata[0]['name']
-    input_type = inputs_metadata[0]['datatype']
+    # go through inputs metadata list to get real input tensor name
+    for i in range(len(inputs_metadata)):
+        if inputs_metadata[i]["name"] == "input":
+            input_name = inputs_metadata[i]['name']
+            input_type = inputs_metadata[i]['datatype']
+
     output_name = outputs_metadata[0]['name']
     output_type = outputs_metadata[0]['datatype']
 
@@ -45,7 +50,7 @@ def classifier_pipeline_http_client(server_addr, server_port, model_name, image_
     assert input_type == 'UINT8', 'invalid input type.'
     assert output_type == 'FP32', 'invalid output type.'
 
-    assert len(outputs_metadata[0]['shape']) == 2, 'invalid output shape.' # (-1, num_classes)
+    assert len(outputs_metadata[0]['shape']) == 2, 'invalid output shape.' # (1, num_classes)
     num_classes = outputs_metadata[0]['shape'][-1]
     if class_names:
         # check if classes number match with model prediction
@@ -59,8 +64,17 @@ def classifier_pipeline_http_client(server_addr, server_port, model_name, image_
 
         # prepare input/output list
         inputs = []
+        inputs.append(httpclient.InferInput("model_name", [1], np_to_triton_dtype(np.object_)))
+        inputs[0].set_data_from_numpy(np.array([target_model_name], dtype=np.object_))
+
+        inputs.append(httpclient.InferInput("model_input_name", [1], np_to_triton_dtype(np.object_)))
+        inputs[1].set_data_from_numpy(np.array([target_input_name], dtype=np.object_))
+
+        inputs.append(httpclient.InferInput("model_output_name", [1], np_to_triton_dtype(np.object_)))
+        inputs[2].set_data_from_numpy(np.array([target_output_name], dtype=np.object_))
+
         inputs.append(httpclient.InferInput(input_name, image_data.shape, "UINT8"))
-        inputs[0].set_data_from_numpy(image_data, binary_data=False)
+        inputs[3].set_data_from_numpy(image_data, binary_data=False)
 
         outputs = []
         outputs.append(httpclient.InferRequestedOutput(output_name, binary_data=False))
@@ -79,7 +93,7 @@ def classifier_pipeline_http_client(server_addr, server_port, model_name, image_
 
 
 
-def classifier_pipeline_grpc_client(server_addr, server_port, model_name, image_files, class_names, output_path):
+def pipeline_bls_sync_grpc_client(server_addr, server_port, model_name, target_model_name, target_input_name, target_output_name, image_files, class_names, output_path):
     # init triton grpc client
     server_url = server_addr + ':' + server_port
     triton_client = grpcclient.InferenceServerClient(url=server_url, verbose=False, ssl=False)
@@ -96,11 +110,15 @@ def classifier_pipeline_grpc_client(server_addr, server_port, model_name, image_
     inputs_metadata = model_metadata.inputs
     outputs_metadata = model_metadata.outputs
 
-    assert len(inputs_metadata) == 1, 'invalid input number.'
+    assert len(inputs_metadata) == 4, 'invalid input number.'
     assert len(outputs_metadata) == 1, 'invalid output number.'
 
-    input_name = inputs_metadata[0].name
-    input_type = inputs_metadata[0].datatype
+    # go through inputs metadata list to get real input tensor name
+    for i in range(len(inputs_metadata)):
+        if inputs_metadata[i].name == "input":
+            input_name = inputs_metadata[i].name
+            input_type = inputs_metadata[i].datatype
+
     output_name = outputs_metadata[0].name
     output_type = outputs_metadata[0].datatype
 
@@ -108,7 +126,7 @@ def classifier_pipeline_grpc_client(server_addr, server_port, model_name, image_
     assert input_type == 'UINT8', 'invalid input type.'
     assert output_type == 'FP32', 'invalid output type.'
 
-    assert len(outputs_metadata[0].shape) == 2, 'invalid output shape.' # (-1, num_classes)
+    assert len(outputs_metadata[0].shape) == 2, 'invalid output shape.' # (1, num_classes)
     num_classes = outputs_metadata[0].shape[-1]
     if class_names:
         # check if classes number match with model prediction
@@ -122,8 +140,17 @@ def classifier_pipeline_grpc_client(server_addr, server_port, model_name, image_
 
         # prepare input/output list
         inputs = []
+        inputs.append(grpcclient.InferInput("model_name", [1], np_to_triton_dtype(np.object_)))
+        inputs[0].set_data_from_numpy(np.array([target_model_name], dtype=np.object_))
+
+        inputs.append(grpcclient.InferInput("model_input_name", [1], np_to_triton_dtype(np.object_)))
+        inputs[1].set_data_from_numpy(np.array([target_input_name], dtype=np.object_))
+
+        inputs.append(grpcclient.InferInput("model_output_name", [1], np_to_triton_dtype(np.object_)))
+        inputs[2].set_data_from_numpy(np.array([target_output_name], dtype=np.object_))
+
         inputs.append(grpcclient.InferInput(input_name, image_data.shape, "UINT8"))
-        inputs[0].set_data_from_numpy(image_data)
+        inputs[3].set_data_from_numpy(image_data)
 
         outputs = []
         outputs.append(grpcclient.InferRequestedOutput(output_name))
@@ -173,13 +200,19 @@ def handle_prediction(prediction, image_file, class_names, output_path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='classifier pipeline http/grpc client for triton inference server')
+    parser = argparse.ArgumentParser(description='classifier pipeline with synchronous bls wrapper classifier pipeline http/grpc client for triton inference server')
     parser.add_argument('--server_addr', type=str, required=False, default='localhost',
         help='triton server address, default=%(default)s')
     parser.add_argument('--server_port', type=str, required=False, default='8000',
         help='triton server port (8000 for http & 8001 for grpc), default=%(default)s')
-    parser.add_argument('--model_name', type=str, required=False, default='classifier_pipeline',
+    parser.add_argument('--model_name', type=str, required=False, default='classifier_pipeline_bls_sync',
         help='model name for inference, default=%(default)s')
+    parser.add_argument('--target_model_name', type=str, required=False, default='classifier_pipeline',
+        help='target model name for invoke, default=%(default)s')
+    parser.add_argument('--target_input_name', type=str, required=False, default='input',
+        help='target model input tensor name, default=%(default)s')
+    parser.add_argument('--target_output_name', type=str, required=False, default='output',
+        help='target model output name, default=%(default)s')
     parser.add_argument('--image_path', type=str, required=True,
         help="image file or directory to inference")
     parser.add_argument('--classes_path', type=str, required=False, default=None,
@@ -203,9 +236,9 @@ def main():
         image_files = [args.image_path]
 
     if args.protocol == 'http':
-        classifier_pipeline_http_client(args.server_addr, args.server_port, args.model_name, image_files, class_names, args.output_path)
+        pipeline_bls_sync_http_client(args.server_addr, args.server_port, args.model_name, args.target_model_name, args.target_input_name, args.target_output_name, image_files, class_names, args.output_path)
     elif args.protocol == 'grpc':
-        classifier_pipeline_grpc_client(args.server_addr, args.server_port, args.model_name, image_files, class_names, args.output_path)
+        pipeline_bls_sync_grpc_client(args.server_addr, args.server_port, args.model_name, args.target_model_name, args.target_input_name, args.target_output_name, image_files, class_names, args.output_path)
     else:
         raise ValueError('invalid protocol: ' + args.protocol)
 

@@ -1,0 +1,46 @@
+name: "classifier_pipeline_bls_sync"
+backend: "python"
+max_batch_size: 0
+input [
+  {
+    name: "model_name"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  },
+  {
+    name: "model_input_name"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  },
+  {
+    name: "model_output_name"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  }
+]
+input [
+  {
+    name: "input"
+    data_type: TYPE_UINT8
+    dims: [ 1, -1 ]
+  }
+]
+output [
+  {
+    name: "output"
+    data_type: TYPE_FP32
+    dims: [ 1, 1000 ]
+  }
+]
+instance_group [
+  {
+    count: 1
+    kind: KIND_CPU
+  }
+]
+version_policy: { all {} }
+
+#model_transaction_policy {
+  #decoupled: false
+#}
+
