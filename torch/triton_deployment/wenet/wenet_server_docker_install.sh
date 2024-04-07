@@ -2,6 +2,7 @@
 #
 # Reference doc:
 # https://github.com/wenet-e2e/wenet/blob/main/runtime/gpu/README.md
+# https://www.cnblogs.com/jax-/p/17776737.html
 
 
 # Download pretrained model "wenetspeech_u2pp_conformer_exp.tar.gz" from wenet model zoo with web browser. link:
@@ -65,6 +66,43 @@ python wenet/bin/export_onnx_gpu.py --config=$MODEL_DIR/train.yaml --checkpoint=
 cp $MODEL_DIR/units.txt $STREAM_ONNX_MODEL_DIR/words.txt
 cp $MODEL_DIR/train.yaml $STREAM_ONNX_MODEL_DIR/
 
+# update hotwords config if needed
+vim  -c 'set encoding=utf-8' $(realpath $PWD)/runtime/gpu/model_repo/scoring/hotwords.yaml # change hotwords list
+
+# update hotwords file path in triton config template file. change following section
+# {
+#   key: "hotwords_path",
+#   value : { string_value: "None"}
+# }
+#
+# to
+#
+# {
+#   key: "hotwords_path",
+#   value : { string_value: "/ws/model_repo/scoring/hotwords.yaml"}
+# }
+#
+vim $(realpath $PWD)/runtime/gpu/model_repo/scoring/config_template.pbtxt
+
+
+# update hotwords config for streaming inference
+vim  -c 'set encoding=utf-8' $(realpath $PWD)/runtime/gpu/model_repo_stateful/wenet/hotwords.yaml # change hotwords list
+
+# update hotwords file path in triton config template file for streaming inference. change following section
+# {
+#   key: "hotwords_path",
+#   value : { string_value: "None"}
+# }
+#
+# to
+#
+# {
+#   key: "hotwords_path",
+#   value : { string_value: "/ws/model_repo/wenet/hotwords.yaml"}
+# }
+#
+vim $(realpath $PWD)/runtime/gpu/model_repo_stateful/wenet/config_template.pbtxt
+
 
 # build server docker image
 cd runtime/gpu/
@@ -75,7 +113,7 @@ cd ../../
 # launch offline model
 docker run --gpus '"device=0"' -it --name "wenet_offline_model" -v $(realpath $PWD)/runtime/gpu/model_repo:/ws/model_repo -v $ONNX_MODEL_DIR:/ws/onnx_model -p 8000:8000 -p 8001:8001 -p 8002:8002 --shm-size=1g --ulimit memlock=-1  wenet_server:latest /workspace/scripts/convert_start_server.sh
 # launch streaming model
-docker run --gpus '"device=0"' -it --name "wenet_stream_model" -v $(realpath $PWD)/model_repo_stateful:/ws/model_repo -v $STREAM_ONNX_MODEL_DIR:/ws/onnx_model -p 8000:8000 -p 8001:8001 -p 8002:8002 --shm-size=1g --ulimit memlock=-1  wenet_server:latest /workspace/scripts/convert_start_server.sh
+docker run --gpus '"device=0"' -it --name "wenet_stream_model" -v $(realpath $PWD)/runtime/gpu/model_repo_stateful:/ws/model_repo -v $STREAM_ONNX_MODEL_DIR:/ws/onnx_model -p 8000:8000 -p 8001:8001 -p 8002:8002 --shm-size=1g --ulimit memlock=-1  wenet_server:latest /workspace/scripts/convert_start_server.sh
 
 # check if server is ready
 curl -v localhost:8000/v2/health/ready

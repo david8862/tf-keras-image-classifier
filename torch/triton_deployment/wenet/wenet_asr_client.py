@@ -9,6 +9,7 @@ import numpy as np
 import math
 from tqdm import tqdm
 import soundfile as sf
+import librosa
 
 import tritonclient.grpc as grpcclient
 #import tritonclient.http as httpclient
@@ -17,13 +18,15 @@ from tritonclient.utils import np_to_triton_dtype
 
 
 class OfflineSpeechClient(object):
-    def __init__(self, triton_client, model_name, protocol_client, args):
+    def __init__(self, triton_client, model_name, protocol_client, sample_rate, args):
         self.triton_client = triton_client
         self.protocol_client = protocol_client
         self.model_name = model_name
+        self.sample_rate = sample_rate
 
     def recognize(self, wav_file, idx=0):
-        waveform, sample_rate = sf.read(wav_file)
+        #waveform, sample_rate = sf.read(wav_file)
+        waveform, sample_rate = librosa.load(wav_file, sr=self.sample_rate)
         samples = np.array([waveform], dtype=np.float32)
         lengths = np.array([[len(waveform)]], dtype=np.int32)
         # better pad waveform to nearest length here
@@ -44,9 +47,14 @@ class OfflineSpeechClient(object):
         outputs = [self.protocol_client.InferRequestedOutput("TRANSCRIPTS")]
         response = self.triton_client.infer(
             self.model_name,
-            inputs,
-            request_id=str(sequence_id),
+            inputs=inputs,
             outputs=outputs,
+            request_id=str(sequence_id),
+            sequence_id=0,
+            sequence_start=False,
+            sequence_end=False,
+            priority=0,
+            timeout=None
         )
         decoding_results = response.as_numpy("TRANSCRIPTS")[0]
         if type(decoding_results) == np.ndarray:
@@ -57,10 +65,11 @@ class OfflineSpeechClient(object):
 
 
 class StreamingSpeechClient(object):
-    def __init__(self, triton_client, model_name, protocol_client, args):
+    def __init__(self, triton_client, model_name, protocol_client, sample_rate, args):
         self.triton_client = triton_client
         self.protocol_client = protocol_client
         self.model_name = model_name
+        self.sample_rate = sample_rate
         chunk_size = args.chunk_size
         subsampling = args.subsampling
         context = args.context
@@ -79,7 +88,8 @@ class StreamingSpeechClient(object):
         self.other_chunk_in_secs = other_chunk_ms / 1000
 
     def recognize(self, wav_file, idx=0):
-        waveform, sample_rate = sf.read(wav_file)
+        #waveform, sample_rate = sf.read(wav_file)
+        waveform, sample_rate = librosa.load(wav_file, sr=self.sample_rate)
         wav_segs = []
         i = 0
         while i < len(waveform):
@@ -132,11 +142,14 @@ class StreamingSpeechClient(object):
 
             response = self.triton_client.infer(
                 self.model_name,
-                inputs,
+                inputs=inputs,
                 outputs=outputs,
+                request_id=str(1),
                 sequence_id=sequence_id,
                 sequence_start=idx == 0,
                 sequence_end=end,
+                priority=0,
+                timeout=None
             )
             idx += 1
             result = response.as_numpy("TRANSCRIPTS")[0].decode("utf-8")
@@ -146,7 +159,7 @@ class StreamingSpeechClient(object):
         return [result]
 
 
-def wenet_asr_inference(server_addr, server_port, model_name, audio_files, streaming, args):
+def wenet_asr_inference(server_addr, server_port, model_name, audio_files, sample_rate, streaming, args):
     # init triton grpc client
     server_url = server_addr + ':' + server_port
     triton_client = grpcclient.InferenceServerClient(url=server_url, verbose=False, ssl=False)
@@ -188,9 +201,9 @@ def wenet_asr_inference(server_addr, server_port, model_name, audio_files, strea
     assert len(outputs_metadata[0].shape) == 2, 'invalid output shape.' # (-1, 1)
 
     if streaming:
-        speech_client = StreamingSpeechClient(triton_client, model_name, grpcclient, args)
+        speech_client = StreamingSpeechClient(triton_client, model_name, grpcclient, sample_rate, args)
     else:
-        speech_client = OfflineSpeechClient(triton_client, model_name, grpcclient, args)
+        speech_client = OfflineSpeechClient(triton_client, model_name, grpcclient, sample_rate, args)
 
     # loop the sample list to predict on each image
     for audio_file in audio_files:
@@ -208,13 +221,13 @@ def main():
         help='model name for inference, default=%(default)s')
     parser.add_argument('--audio_path', type=str, required=True,
         help="audio file or directory to inference")
+    parser.add_argument('--sample_rate', type=int, required=False, default=16000,
+        help="sample rate used by model, default=%(default)s")
     parser.add_argument('--streaming', default=False, action="store_true",
         help='Whether to run streaming inference model')
 
     # below arguments are for streaming inference
     # Please check onnx_config.yaml and train.yaml
-    #parser.add_argument('--sample_rate', type=int, required=False, default=16000,
-        #help="sample rate used in training, default=%(default)s")
     parser.add_argument('--frame_length_ms', type=int, required=False, default=25,
         help="audio frame length in ms, default=%(default)s")
     parser.add_argument('--frame_shift_ms', type=int, required=False, default=10,
@@ -235,7 +248,7 @@ def main():
     else:
         audio_files = [args.audio_path]
 
-    wenet_asr_inference(args.server_addr, args.server_port, args.model_name, audio_files, args.streaming, args)
+    wenet_asr_inference(args.server_addr, args.server_port, args.model_name, audio_files, args.sample_rate, args.streaming, args)
 
 
 
