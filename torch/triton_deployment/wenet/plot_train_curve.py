@@ -53,6 +53,7 @@ def draw_curve(checkpoint_path, output_file):
     plt.plot(epoch_num_list, epoch_acc_list, 'o-', color='r', label="epoch accuracy")
     plt.xlabel("epoch")
     plt.ylabel("accuracy")
+    plt.legend()
 
     # subplot for loss curve
     plt.subplot(2, 1, 2)
@@ -60,6 +61,7 @@ def draw_curve(checkpoint_path, output_file):
     plt.plot(epoch_num_list, epoch_loss_list, 's-', color='b', label="epoch loss")
     plt.xlabel("epoch")
     plt.ylabel("loss")
+    plt.legend()
 
     # save or show result
     plt.tick_params(labelsize='medium') # set tick font size

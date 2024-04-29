@@ -105,9 +105,10 @@ sudo git clone https://github.com/congard/nvidia-system-monitor-qt
 cd nvidia-system-monitor-qt
 sudo install icon.png /usr/share/icons/hicolor/512x512/apps/nvidia-system-monitor-qt.png
 mkdir build
-cmake -DCMAKE_BUILD_TYPE=Release -DIconPath=/usr/share/icons/hicolor/512x512/apps/nvidia-system-monitor-qt.png -B build -G "Unix Makefiles"
-cmake --build build --target qnvsm -- -j 4
-sudo install build/qnvsm /usr/local/bin
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release -DIconPath=/usr/share/icons/hicolor/512x512/apps/nvidia-system-monitor-qt.png -G "Unix Makefiles" ..
+cmake --target qnvsm -- -j 4
+sudo install qnvsm /usr/local/bin
 
 
 # install wenet dependency packages
