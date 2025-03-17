@@ -3,6 +3,7 @@
 
 # install NVIDIA-driver/CUDA/CuDNN on Ubuntu 22.04
 # Reference: https://blog.csdn.net/qq_49323609/article/details/130310522
+wget https://cn.download.nvidia.com/XFree86/Linux-x86_64/570.124.04/NVIDIA-Linux-x86_64-570.124.04.run
 wget https://us.download.nvidia.com/XFree86/Linux-x86_64/550.67/NVIDIA-Linux-x86_64-550.67.run
 wget https://developer.download.nvidia.com/compute/cuda/11.7.0/local_installers/cuda_11.7.0_515.43.04_linux.run
 wget https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/linux-x86_64/cudnn-linux-x86_64-8.6.0.163_cuda11-archive.tar.xz
@@ -22,7 +23,8 @@ sudo apt install gcc-12 g++-12
 sudo ln -s -f /usr/bin/gcc-12 /usr/bin/gcc
 sudo ln -s -f /usr/bin/g++-12 /usr/bin/g++
 
-
+# uninstall any existing NVIDIA driver, then reboot
+sudo apt-get --purge remove nvidia*
 sudo update-initramfs -u
 sudo reboot
 
@@ -30,7 +32,8 @@ sudo reboot
 telinit 3
 sudo service gdm stop
 sudo service lightdm stop
-
+# if you still meet install failure, try to download latest NVIDIA driver from
+# https://www.nvidia.cn/drivers/lookup/ and use it
 sudo chmod a+x NVIDIA-Linux-x86_64-550.67.run
 sudo ./NVIDIA-Linux-x86_64-550.67.run -no-x-check -no-nouveau-check -no-opengl-files
 
