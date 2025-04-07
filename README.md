@@ -111,6 +111,10 @@ Following is reference config cmd for training mobilenetv2 model:
 ```
 # python train.py --model_type=mobilenetv2 --model_input_shape=112x112 --train_data_path=./train_data/ --val_data_path=./val_data/ --decay_type=cosine --transfer_epoch=1
 ```
+or training on GPU 0, 1 and 2, if you have several GPUs on your host/server:
+```
+# CUDA_VISIBLE_DEVICES=0,1,2 python train.py --model_type=mobilenetv2 --model_input_shape=112x112 --train_data_path=./train_data/ --val_data_path=./val_data/ --decay_type=cosine --transfer_epoch=1
+```
 
 Checkpoints during training could be found at `logs/000/`. Choose a best one as result
 
