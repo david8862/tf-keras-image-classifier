@@ -72,7 +72,7 @@ source ~/.bashrc
 # install CuDNN
 tar xvf cudnn-linux-x86_64-8.6.0.163_cuda11-archive.tar.xz
 cp -drf cudnn-linux-x86_64-8.6.0.163_cuda11-archive/include/* /usr/local/cuda/include/
-cp -drf cudcp cudnn-linux-x86_64-8.6.0.163_cuda11-archive/LICENSE /usr/local/cuda/nn-linux-x86_64-8.6.0.163_cuda11-archive/lib/* /usr/local/cuda/lib64/
+cp -drf cudnn-linux-x86_64-8.6.0.163_cuda11-archive/lib/* /usr/local/cuda/lib64/
 cp -drf cudnn-linux-x86_64-8.6.0.163_cuda11-archive/LICENSE /usr/local/cuda/
 
 
