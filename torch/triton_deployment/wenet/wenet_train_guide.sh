@@ -1,6 +1,56 @@
 #!/bin/bash
 #
 
+# install NVIDIA-driver/CUDA/CuDNN/Python/virtualenv/PyTorch on Windows 11
+# Reference:
+#    https://docs.nvidia.com/deeplearning/cudnn/backend/latest/reference/support-matrix.html
+#    https://cloud.baidu.com/article/3326019
+#    https://www.nvidia.com/en-us/geforce/graphics-cards/gt-1030/specifications/
+#    https://blog.csdn.net/qq_45792697/article/details/123511064
+#
+# download Nvidia driver(need auth), then double click to install
+wget https://cn.download.nvidia.com/Windows/572.83/572.83-desktop-win10-win11-64bit-international-dch-whql.exe
+# launch cmd, then run "nvidia-smi" to verify the driver installation
+nvidia-smi
+#
+# download CUDA, then double click to install (choose "custom install", and only select needed components,
+# don't install Nvidia driver here)
+wget https://developer.download.nvidia.com/compute/cuda/12.6.0/local_installers/cuda_12.6.0_560.76_windows.exe
+# launch cmd, then run "nvcc --version" to verify the CUDA installation
+nvcc --version
+#
+# download cuDNN, then extract the .zip package, and copy the "bin", "include", "lib" dir to corresponding dir
+# under CUDA install path, like: "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\bin\"
+wget https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/windows-x86_64/cudnn-windows-x86_64-9.8.0.87_cuda12-archive.zip
+# launch cmd and cd to "CUDA_install_path\extras\demo_suite" dir, then run "bandwidthTest.exe" and "deviceQuery.exe"
+# to verify the cuDNN installation
+C:
+cd Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\extras\demo_suite
+bandwidthTest.exe
+deviceQuery.exe
+#
+# download Python 3.13.3 from "https://www.python.org/", then double click to install,
+# remember to choose "Add python.exe to PATH" on 1st page
+wget https://www.python.org/ftp/python/3.13.3/python-3.13.3-amd64.exe
+# launch cmd, then run "python" to verify the python installation
+python
+#
+# launch cmd and install virtualenvwrapper for Windows, then create & config the virtualenv path
+# See: https://blog.csdn.net/qq_45792697/article/details/123511064
+pip install --upgrade pip
+pip install virtualenvwrapper-win
+#
+# launch cmd to create a virtual environment, then install PyTorch-gpu 2.6.0 from "https://pytorch.org/"
+mkvirtualenv -p python3.13 py313_ml
+workon py313_ml
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+# run python, then import PyTorch to check if GPU is available
+python
+>>> import torch
+>>> torch.cuda.is_available()
+True
+
+
 # install NVIDIA-driver/CUDA/CuDNN on Ubuntu 22.04
 # Reference: https://blog.csdn.net/qq_49323609/article/details/130310522
 wget https://cn.download.nvidia.com/XFree86/Linux-x86_64/570.124.04/NVIDIA-Linux-x86_64-570.124.04.run
