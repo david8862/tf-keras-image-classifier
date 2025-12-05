@@ -21,6 +21,10 @@ optimize_tf_gpu(tf, K)
 def main(args):
     log_dir = 'logs/000'
 
+    # disable GPU training if needed
+    if args.no_cuda:
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
     # get class info
     if args.classes_path:
         class_names = get_classes(args.classes_path)
@@ -159,7 +163,8 @@ if __name__ == '__main__':
         help = "Total training epochs, default=%(default)s")
     parser.add_argument('--gpu_num', type=int, required=False, default=1,
         help='Number of GPU to use, default=%(default)s')
-
+    parser.add_argument('--no_cuda', action='store_true', default=False,
+        help='disables CUDA training')
 
     args = parser.parse_args()
     height, width = args.model_input_shape.split('x')
