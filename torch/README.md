@@ -107,6 +107,11 @@ or training on GPU 0, 1 and 2, if you have several GPUs on your host/server:
 
 Checkpoints during training could be found at `logs/000/`. Choose a best one as result
 
+You can also use Tensorboard to monitor the loss trend during train:
+```
+# tensorboard --logdir=logs/000 [--host="host public IP address"]
+```
+
 For MobileNetV2/V3 family, you can manually change its width multiply param in [model.py](https://github.com/david8862/tf-keras-image-classifier/blob/master/torch/classifier/model.py)
 
 

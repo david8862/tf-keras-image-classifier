@@ -1,12 +1,22 @@
 #!/bin/bash
 #
 
+############################################################################################
 # install NVIDIA-driver/CUDA/CuDNN/Python/virtualenv/PyTorch on Windows 11
 # Reference:
 #    https://docs.nvidia.com/deeplearning/cudnn/backend/latest/reference/support-matrix.html
 #    https://cloud.baidu.com/article/3326019
 #    https://www.nvidia.com/en-us/geforce/graphics-cards/gt-1030/specifications/
 #    https://blog.csdn.net/qq_45792697/article/details/123511064
+#
+# NOTE: Due to lack of compatibility for Tensorflow on new CUDA version (e.g. CUDA-12.6 and later).
+#       A workable version set for both TF & PyTorch as follows:
+#
+#       Nvidia driver: no limit (newer the better)
+#       CUDA: 11.7.0
+#       Cudnn: 8.6.0
+#       Tensorflow-gpu: 2.11.0
+#       PyTorch: 2.2.0+cu121
 #
 # download Nvidia driver(need auth), then double click to install
 wget https://cn.download.nvidia.com/Windows/572.83/572.83-desktop-win10-win11-64bit-international-dch-whql.exe
@@ -51,6 +61,49 @@ python
 True
 
 
+############################################################################################
+# install NVIDIA-driver on Ubuntu 24.04
+# Reference: https://zhuanlan.zhihu.com/p/1894453286439982079
+
+# add nvidia driver repo into apt sources
+sudo add-apt-repository ppa:graphics-drivers/ppa
+sudo apt update
+
+# install dependencies
+sudo apt install -y alsa-utils
+sudo apt install -y pciutils ubuntu-drivers-common
+
+# check NVIDIA card info
+lspci | grep -i nvidia
+02:00.0 VGA compatible controller: NVIDIA Corporation GM107GL [Quadro K620] (rev a2)
+02:00.1 Audio device: NVIDIA Corporation GM107 High Definition Audio Controller [GeForce 940MX] (rev a1)
+
+# search recommended driver
+sudo ubuntu-drivers devices
+== /sys/devices/pci0000:00/0000:00:1a.0/0000:02:00.0 ==
+modalias : pci:v000010DEd000013BBsv0000103Csd00001098bc03sc00i00
+vendor   : NVIDIA Corporation
+model    : GM107GL [Quadro K620]
+driver   : nvidia-driver-555 - third-party non-free recommended
+driver   : nvidia-driver-390 - third-party non-free
+driver   : nvidia-driver-470 - third-party non-free
+......
+driver   : xserver-xorg-video-nouveau - distro free builtin
+......
+
+# install recommended driver, then reboot
+sudo apt install nvidia-driver-555
+sudo reboot
+
+# after reboot, check installation with 'nvidia-smi' command
+nvidia-smi
+
+# the following CUDA/CuDNN & related tools installation is same as next part:
+# "install NVIDIA-driver/CUDA/CuDNN on Ubuntu 22.04"
+
+
+
+############################################################################################
 # install NVIDIA-driver/CUDA/CuDNN on Ubuntu 22.04
 # Reference: https://blog.csdn.net/qq_49323609/article/details/130310522
 wget https://cn.download.nvidia.com/XFree86/Linux-x86_64/570.124.04/NVIDIA-Linux-x86_64-570.124.04.run
@@ -107,7 +160,7 @@ sudo reboot
 # │                                                                              │
 # └──────────────────────────────────────────────────────────────────────────────┘
 #
-sudo ./cuda_11.7.0_515.43.04_linux.run
+sudo ./cuda_11.7.0_515.43.04_linux.run --override
 
 # add CUDA related path in system
 sudo cat >> ~/.bashrc << EOF
@@ -160,8 +213,10 @@ sudo install icon.png /usr/share/icons/hicolor/512x512/apps/nvidia-system-monito
 mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release -DIconPath=/usr/share/icons/hicolor/512x512/apps/nvidia-system-monitor-qt.png -G "Unix Makefiles" ..
-cmake --target qnvsm -- -j 4
-sudo install qnvsm /usr/local/bin
+cd ..
+cmake --build build --target qnvsm -- -j 4
+sudo install build/qnvsm /usr/local/bin
+qnvsm &
 
 
 # install wenet dependency packages
