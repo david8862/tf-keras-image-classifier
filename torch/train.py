@@ -8,7 +8,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
-from torchsummary import summary
+#import torchsummary
+import torchinfo
 
 from classifier.model import Classifier
 from classifier.data import get_dataloader
@@ -212,7 +213,9 @@ def main():
 
     # get train model
     model = Classifier(args.model_type, num_classes, args.head_conv_channel).to(device)
-    summary(model, input_size=(3,)+args.model_input_shape)
+
+    #torchsummary.summary(model, input_size=(3,)+args.model_input_shape, batch_size=1)
+    torchinfo.summary(model, input_size=(1, 3)+args.model_input_shape)
 
     if args.weights_path:
         model.load_state_dict(torch.load(args.weights_path, map_location=device))
