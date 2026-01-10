@@ -1,0 +1,2 @@
+carpet
+no_carpet

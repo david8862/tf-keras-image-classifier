@@ -59,7 +59,7 @@ def generate_featuremap(image_path, model_path, model_input_shape, layer_names, 
         image_data = np.expand_dims(image_data, axis=0)
 
         # get featuremap outputs
-        featuremaps = featuremap_model.predict([image_data])
+        featuremaps = featuremap_model.predict([image_data], verbose=0)
         if isinstance(featuremaps, np.ndarray):
             featuremaps = [featuremaps]
 

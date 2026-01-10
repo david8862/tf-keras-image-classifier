@@ -79,7 +79,7 @@ def generate_heatmap(image_path, model_path, heatmap_path, class_names=None):
         x = np.expand_dims(x, axis=0)
 
         # predict and get output
-        preds = model.predict(x)
+        preds = model.predict(x, verbose=0)
         index = np.argmax(preds[0])
         score = preds[0][index]
         max_output = model.output[:, index]

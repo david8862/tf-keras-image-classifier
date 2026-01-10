@@ -1,9 +1,11 @@
 numpy
 scipy
 scikit-learn
-opencv-python
-opencv-contrib-python
-tensorflow
+opencv-python-headless
+opencv-contrib-python-headless
+#opencv-python
+#opencv-contrib-python
+tensorflow==2.11.0
 keras_applications
 matplotlib
 tqdm

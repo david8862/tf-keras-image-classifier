@@ -23,7 +23,7 @@ optimize_tf_gpu(tf, K)
 
 
 def predict_keras(model, data, class_index):
-    output = model.predict(data)
+    output = model.predict(data, verbose=0)
     pred = np.argmax(output, axis=-1)
 
     class_score = output[:, class_index]

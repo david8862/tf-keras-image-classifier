@@ -1,7 +1,11 @@
 #!/usr/bin/python3
 # -*- coding=utf-8 -*-
 """Model utility functions."""
-from tensorflow.keras.optimizers import Adam, RMSprop, SGD
+# try to use legecy optimizer if possible
+try:
+    from tensorflow.keras.optimizers.legacy import Adam, RMSprop, SGD
+except:
+    from tensorflow.keras.optimizers import Adam, RMSprop, SGD
 from tensorflow.keras.optimizers.schedules import ExponentialDecay, PolynomialDecay, PiecewiseConstantDecay
 from tensorflow.keras.experimental import CosineDecay
 

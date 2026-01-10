@@ -1,0 +1,3 @@
+0_wooden_floor
+1_hard_floor
+2_other

@@ -19,9 +19,10 @@ An end-to-end CNN image classification model training framework. Implement with 
 
 ### Train
 
-1. Install requirements on Ubuntu 16.04/18.04:
+1. Install requirements on Ubuntu 22.04/24.04 (with Python 3.10):
 
 ```
+# apt install imagemagick
 # pip install -r requirements.txt
 ```
 
