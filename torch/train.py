@@ -215,7 +215,7 @@ def main():
     model = Classifier(args.model_type, num_classes, args.head_conv_channel).to(device)
 
     #torchsummary.summary(model, input_size=(3,)+args.model_input_shape, batch_size=1)
-    torchinfo.summary(model, input_size=(1, 3)+args.model_input_shape)
+    torchinfo.summary(model, input_size=(1, 3)+args.model_input_shape, device=device)
 
     if args.weights_path:
         model.load_state_dict(torch.load(args.weights_path, map_location=device))
