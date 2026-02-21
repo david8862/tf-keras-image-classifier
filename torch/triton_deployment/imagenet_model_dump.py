@@ -5,7 +5,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchsummary import summary
+import torchsummary
+#import torchinfo
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
 from torchvision.models import resnet50
@@ -68,20 +69,23 @@ class Classifier(nn.Module):
 
 
 def model_dump(model_type, model_input_shape, batch_size, output_path):
+    device = torch.device("cpu")
+
     # get model
-    model = Classifier(model_type)
-    summary(model, input_size=(3,)+model_input_shape)
+    model = Classifier(model_type).to(device)
+    torchsummary.summary(model, input_size=(3,)+model_input_shape, batch_size=1, device='cpu')
+    #torchinfo.summary(model, input_size=(1, 3)+model_input_shape, device=device)
 
     os.makedirs(output_path, exist_ok=True)
 
     if batch_size == -1:
-        input_tensor = torch.randn((1, 3, *model_input_shape))
+        input_tensor = torch.randn((1, 3, *model_input_shape), device=device)
 
         # dump dynamic batch-size onnx model
         torch.onnx.export(model, input_tensor, os.path.join(output_path, 'model.onnx'), verbose=False, opset_version=12, input_names=['image_input'], output_names=['scores'],
                           dynamic_axes={"image_input": {0: "batch_size"}, "scores": {0: "batch_size"}})
     else:
-        input_tensor = torch.randn((batch_size, 3, *model_input_shape))
+        input_tensor = torch.randn((batch_size, 3, *model_input_shape), device=device)
 
         # dump fix batch-size onnx model
         torch.onnx.export(model, input_tensor, os.path.join(output_path, 'model.onnx'), verbose=False, opset_version=12, input_names=['image_input'], output_names=['scores'])
@@ -111,6 +115,7 @@ def main():
     args.model_input_shape = (int(height), int(width))
 
     model_dump(args.model_type, args.model_input_shape, args.batch_size, args.output_path)
+    print('\nDone. Dumped model has been saved to', args.output_path)
 
 
 if __name__ == "__main__":

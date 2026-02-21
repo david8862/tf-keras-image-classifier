@@ -16,15 +16,15 @@ find_package(RapidJSON CONFIG REQUIRED)
 message(STATUS "Using curl ${CURL_VERSION_STRING}")
 #message(STATUS "Using zlib ${ZLIB_VERSION_STRING}")
 
-#set(TRITON_CLIENT_ROOT_PATH /mnt/e/Downloads/triton_client/src/c++)
-link_directories("${TRITON_CLIENT_ROOT_PATH}/build/library/")
+#set(TRITON_CLIENT_ROOT_PATH /mnt/e/Downloads/triton_client/)
+link_directories("${TRITON_CLIENT_ROOT_PATH}/build/install/lib/")
 
 set(CLASSIFIER_HTTP_CLIENT_SRC
         classifier_http_client.cpp)
 add_executable(classifier_http_client ${CLASSIFIER_HTTP_CLIENT_SRC})
 
 target_include_directories(classifier_http_client PUBLIC ${RapidJSON_INCLUDE_DIRS}
-                           PRIVATE ${TRITON_CLIENT_ROOT_PATH}/library/ ${TRITON_CLIENT_ROOT_PATH}/build/_deps/repo-common-build/protobuf/)
+                           PRIVATE ${TRITON_CLIENT_ROOT_PATH}/src/c++/library/ ${TRITON_CLIENT_ROOT_PATH}/build/_deps/repo-common-build/protobuf/)
 
 target_link_libraries(classifier_http_client PRIVATE libhttpclient.so)
 #target_link_libraries(classifier_http_client PRIVATE libhttpclient_static.a
@@ -36,7 +36,7 @@ set(PIPELINE_HTTP_CLIENT_SRC
 add_executable(pipeline_http_client ${PIPELINE_HTTP_CLIENT_SRC})
 
 target_include_directories(pipeline_http_client PUBLIC ${RapidJSON_INCLUDE_DIRS}
-                           PRIVATE ${TRITON_CLIENT_ROOT_PATH}/library/ ${TRITON_CLIENT_ROOT_PATH}/build/_deps/repo-common-build/protobuf/)
+                           PRIVATE ${TRITON_CLIENT_ROOT_PATH}/src/c++/library/ ${TRITON_CLIENT_ROOT_PATH}/build/_deps/repo-common-build/protobuf/)
 
 target_link_libraries(pipeline_http_client PRIVATE libhttpclient.so)
 #target_link_libraries(pipeline_http_client PRIVATE libhttpclient_static.a

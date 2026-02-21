@@ -690,21 +690,21 @@ void RunInference(Settings* s)
 }
 
 
-void display_usage() {
-    std::cout
-        << "Usage: classifier_http_client\n"
-        << "--server_addr, -a: localhost\n"
-        << "--server_port, -p: 8000\n"
-        << "--model_name, -m: classifier_onnx\n"
-        << "--image, -i: image_name.jpg\n"
-        << "--classes, -l: classes labels for the model\n"
-        << "--top_k, -k: show top k classes result\n"
-        << "--input_mean, -b: input mean\n"
-        << "--input_std, -s: input standard deviation\n"
-        << "--count, -c: loop model run for certain times\n"
-        << "--warmup_runs, -w: number of warmup runs\n"
-        << "--verbose, -v: [0|1] print more information\n"
-        << "\n";
+void display_usage()
+{
+    printf("Usage: classifier_http_client\n" \
+           "--server_addr, -a: triton server address. default: 'localhost'\n" \
+           "--server_port, -p: triton server port. default: '8000'\n" \
+           "--model_name, -m: model name for inference. default: 'classifier_onnx'\n" \
+           "--image, -i: image file to inference. default: './dog.jpg'\n" \
+           "--classes, -l: path to class name definitions. default: './classes.txt'\n" \
+           "--top_k, -k: show top k classes result. default: '1'\n" \
+           "--input_mean, -b: input mean. default: '127.5'\n" \
+           "--input_std, -s: input standard deviation. default: '127.5'\n" \
+           "--count, -c: loop model run for certain times. default: '1'\n" \
+           "--warmup_runs, -w: number of warmup runs. default: '2'\n" \
+           "--verbose, -v: [0|1] print more information. default: '0'\n" \
+           "\n");
     return;
 }
 

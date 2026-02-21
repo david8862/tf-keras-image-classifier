@@ -252,7 +252,7 @@ def main():
     parser.add_argument('--classes_path', type=str, required=False, default=None,
         help='path to class name definitions')
     parser.add_argument('--output_path', type=str, required=False, default=None,
-        help='output path to save dumped model, default=%(default)s')
+        help='output path to save inference result, default=%(default)s')
     parser.add_argument('--protocol', type=str, required=False, default='http', choices=['http', 'grpc'],
         help="comm protocol between triton server & client (http/grpc), default=%(default)s")
 
