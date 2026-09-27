@@ -17,7 +17,7 @@ def model_export(model_path, model_input_shape, op_set, output_path, batch_size)
         img = torch.zeros((batch_size, 3, *model_input_shape))
 
     # Load PyTorch model
-    model = torch.load(model_path, map_location=torch.device('cpu')).float()
+    model = torch.load(model_path, map_location=torch.device('cpu'), weights_only=False).float()
     model.eval()
     y = model(img)  # dry run
 
